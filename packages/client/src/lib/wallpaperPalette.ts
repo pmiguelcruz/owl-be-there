@@ -17,11 +17,17 @@ export function wallpaperPaletteStyle(look: WallpaperLook): CSSProperties {
   } as CSSProperties;
 }
 
-const homeWallpaper = new Store(browserBacking('sessionStorage'));
+const tabWallpaper = new Store(browserBacking('sessionStorage'));
+const sharedWallpaper = new Store(browserBacking());
 const homeKey = 'owl.home-wallpaper';
 
-export function newHomeWallpaper(): WallpaperLook {
-  const previous = homeWallpaper.read(homeKey, WallpaperLookSpec);
+/** In a tab, only loading the homepage rolls new colors. Fresh tabs use the
+ * most recent homepage look in this browser. */
+export function siteWallpaper(rotate: boolean): WallpaperLook {
+  const previous =
+    tabWallpaper.read(homeKey, WallpaperLookSpec) ??
+    sharedWallpaper.read(homeKey, WallpaperLookSpec);
+  if (previous && !rotate) return previous;
   const gradients = WALLPAPER_GRADIENTS.filter(
     (style) => style !== previous?.gradient
   );
@@ -34,6 +40,11 @@ export function newHomeWallpaper(): WallpaperLook {
   };
 }
 
-export function rememberHomeWallpaper(look: WallpaperLook): void {
-  homeWallpaper.write(homeKey, look);
+export function rememberSiteWallpaper(
+  look: WallpaperLook,
+  home: boolean
+): void {
+  tabWallpaper.write(homeKey, look);
+  if (home || !sharedWallpaper.read(homeKey, WallpaperLookSpec))
+    sharedWallpaper.write(homeKey, look);
 }

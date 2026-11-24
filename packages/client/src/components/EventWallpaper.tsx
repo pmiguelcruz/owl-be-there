@@ -12,7 +12,7 @@ export const EventWallpaper = memo(function EventWallpaper({
 }: {
   look: WallpaperLook;
   className: string;
-  surface?: 'event' | 'home' | 'preview';
+  surface?: 'event' | 'home' | 'site' | 'preview';
 }) {
   const id = useId();
   const palette = lookPalette(look);

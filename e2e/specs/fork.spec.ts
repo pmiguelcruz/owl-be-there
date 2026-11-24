@@ -62,6 +62,66 @@ test('the homepage rotates its look and gradient on refresh', async ({
   ).toBeVisible();
 });
 
+test('the homepage look follows the interface through Admin reloads and fresh tabs', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  const homepage = page.locator('[data-wallpaper="home"]');
+  await expect(homepage).toBeVisible();
+  const recipe = (await homepage.getAttribute('data-look'))!;
+  const site = page.locator('[data-wallpaper="site"]');
+  const nav = page.getByRole('link', { name: 'Admin', exact: true });
+  const fill = () =>
+    nav.evaluate((link) => getComputedStyle(link).backgroundColor);
+  const homeFill = await fill();
+
+  await nav.click();
+  await expect(site).toHaveAttribute('data-look', recipe);
+  await expect(nav).toHaveCSS('background-color', homeFill);
+  const pin = page.getByLabel('Admin PIN', { exact: true });
+  await expect(pin).toBeVisible();
+  const panel = page.locator('main section').filter({ has: pin });
+  const alpha = await panel.evaluate((element) => {
+    const sample = document.createElement('canvas').getContext('2d')!;
+    sample.fillStyle = getComputedStyle(element).backgroundColor;
+    sample.fillRect(0, 0, 1, 1);
+    return sample.getImageData(0, 0, 1, 1).data[3]!;
+  });
+  expect(alpha).toBeGreaterThan(228);
+  expect(alpha).toBeLessThan(245);
+
+  await page.reload();
+  await expect(site).toHaveAttribute('data-look', recipe);
+  await expect(nav).toHaveCSS('background-color', homeFill);
+  const fresh = await page.context().newPage();
+  await fresh.goto(new URL('/admin', page.url()).href);
+  await expect(fresh.locator('[data-wallpaper="site"]')).toHaveAttribute(
+    'data-look',
+    recipe
+  );
+  await fresh.close();
+
+  await page.getByRole('link', { name: 'About', exact: true }).click();
+  await expect(site).toHaveAttribute('data-look', recipe);
+  await expect(nav).toHaveCSS('background-color', homeFill);
+  await page.getByLabel('Theme').selectOption('light');
+  await expect(site).toHaveAttribute('data-look', recipe);
+  await expect(nav).not.toHaveCSS('background-color', homeFill);
+
+  const { id } = await createEvent(request, {
+    theme: { version: 1, pattern: { seed: 112, gradient: 'radial' } },
+  });
+  await page.goto(`/e/${id}`);
+  await expect(page.locator('[data-wallpaper="event"]')).toHaveAttribute(
+    'data-look',
+    '112:radial'
+  );
+  await expect(site).toHaveCount(0);
+  await nav.click();
+  await expect(site).toHaveAttribute('data-look', recipe);
+});
+
 test('admin unlock rejects an incorrect PIN and a reload locks the page', async ({
   page,
 }) => {

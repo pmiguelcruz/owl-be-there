@@ -131,7 +131,9 @@ export function EventPage({
   if (state.status === 'loading') {
     return (
       <div className="flex flex-col items-center gap-4 py-20" role="status">
-        <p className="font-bold text-muted">{t('event.loading')}</p>
+        <p className="rounded-xl bg-surface px-3 py-2 font-bold text-muted">
+          {t('event.loading')}
+        </p>
       </div>
     );
   }
@@ -189,7 +191,11 @@ function EndState({ status }: { status: 'not-found' | 'deleted' | 'error' }) {
   }, [status]);
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
-      <h1 ref={heading} tabIndex={-1} className="text-3xl font-black">
+      <h1
+        ref={heading}
+        tabIndex={-1}
+        className="rounded-xl bg-surface px-4 py-3 text-3xl font-black"
+      >
         {status === 'deleted'
           ? t('event.deleted')
           : status === 'error'
@@ -197,7 +203,9 @@ function EndState({ status }: { status: 'not-found' | 'deleted' | 'error' }) {
             : t('event.notFound.title')}
       </h1>
       {status === 'not-found' && (
-        <p className="max-w-lg text-muted">{t('event.notFound.text')}</p>
+        <p className="max-w-lg rounded-xl bg-surface px-4 py-2 text-muted">
+          {t('event.notFound.text')}
+        </p>
       )}
     </div>
   );

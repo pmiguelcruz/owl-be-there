@@ -97,7 +97,8 @@
   }
 }
 
-:root:has([data-event-page], [data-home-page]),
+:root:has([data-event-page]),
+:root:not([data-theme='light']):has([data-site-palette]),
 :root[data-theme='dark'] {
   color-scheme: dark;
   --owl-bg: #16182b;
@@ -137,9 +138,10 @@
   --owl-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
 }
 
-/* Tint event chrome with the wallpaper palette. Calendar availability keeps
+/* Tint the interface with its wallpaper palette. Calendar availability keeps
  * its shared green and amber colors. */
 [data-event-palette],
+[data-site-palette],
 [data-wallpaper-palette] {
   --owl-bg: var(--event-base);
   --owl-surface-solid: color-mix(
@@ -195,7 +197,48 @@
   color: var(--owl-ink);
 }
 
-:is([data-event-palette], [data-home-page]) .site-wordmark {
+/* Light mode uses lighter surfaces from the same gradient's palette. */
+:root[data-theme='light'] [data-site-palette] {
+  color-scheme: light;
+  --owl-surface-solid: color-mix(
+    in srgb,
+    var(--event-lettering) 86%,
+    var(--event-highlight)
+  );
+  --owl-sunken: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--event-lettering) 65%, var(--event-highlight)) 94%,
+    transparent
+  );
+  --owl-ink: var(--event-base);
+  --owl-muted: color-mix(in srgb, var(--event-base) 82%, var(--event-ink));
+  --owl-line: color-mix(
+    in srgb,
+    var(--owl-surface-solid) 57%,
+    var(--event-base)
+  );
+  --owl-line-strong: color-mix(
+    in srgb,
+    var(--event-ink) 65%,
+    var(--event-base)
+  );
+  --owl-brand: color-mix(in srgb, var(--event-base) 58%, var(--event-ink));
+  --owl-brand-hover: color-mix(
+    in srgb,
+    var(--event-base) 68%,
+    var(--event-ink)
+  );
+  --owl-brand-ink: var(--event-lettering);
+  --owl-brand-soft: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--owl-surface-solid) 77%, var(--event-highlight)) 94%,
+    transparent
+  );
+  --owl-focus: var(--owl-line-strong);
+  --owl-danger: #7f1d1d;
+}
+
+:is([data-event-palette], [data-site-palette]) .site-wordmark {
   background: var(--owl-surface);
 }
 

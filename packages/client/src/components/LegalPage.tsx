@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { Card, Notice } from './ui.tsx';
 
 /**
- * The frame of the legal pages: the owl and the heading, which may wrap and
- * shrink on a phone, then either the notice that the instance's details are
+ * The frame of the legal pages: a heading that can wrap on a phone, followed
+ * by either a notice that the instance's details are
  * still loading (or failed to) in place of the card, or the card itself.
  */
 export function LegalPage({
@@ -18,11 +18,9 @@ export function LegalPage({
 }) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-black break-words sm:text-3xl">
-          {title}
-        </h1>
-      </div>
+      <h1 className="self-start rounded-xl bg-surface px-3 py-2 text-2xl font-black break-words sm:text-3xl">
+        {title}
+      </h1>
       {notice ? (
         <Notice tone={notice.tone}>{notice.text}</Notice>
       ) : (

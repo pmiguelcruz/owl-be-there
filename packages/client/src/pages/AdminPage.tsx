@@ -85,7 +85,9 @@ export function AdminPage({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 py-4">
-      <h1 className="text-3xl font-black">{t('siteAdmin.title')}</h1>
+      <h1 className="self-start rounded-xl bg-surface px-3 py-2 text-3xl font-black">
+        {t('siteAdmin.title')}
+      </h1>
       {!session && (
         <Card className="max-w-md">
           <form
@@ -152,7 +154,9 @@ export function AdminPage({
         (directory.events.length ? (
           <EventList events={directory.events} admin />
         ) : (
-          <p className="text-muted">{t('siteAdmin.noEvents')}</p>
+          <p className="self-start rounded-xl bg-surface px-3 py-2 text-muted">
+            {t('siteAdmin.noEvents')}
+          </p>
         ))}
       {creating && (
         <div hidden={!session}>

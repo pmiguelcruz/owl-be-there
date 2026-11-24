@@ -24,8 +24,8 @@ import {
 } from './lib/instanceStore.ts';
 import { OWL_ICON, setFavicon } from './lib/favicon.ts';
 import {
-  newHomeWallpaper,
-  rememberHomeWallpaper,
+  siteWallpaper,
+  rememberSiteWallpaper,
   wallpaperPaletteStyle,
 } from './lib/wallpaperPalette.ts';
 import { usePathname } from './hooks/usePathname.ts';
@@ -72,7 +72,7 @@ function Shell() {
   const instance = instanceState.info;
   const [adminSession, setAdminSession] = useState<string | null>(null);
   const [eventLook, setEventLook] = useState<WallpaperLook | null>(null);
-  const [homeLook] = useState(newHomeWallpaper);
+  const [homeLook] = useState(() => siteWallpaper(route.page === 'home'));
   const clearAdmin = useCallback(() => setAdminSession(null), []);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
@@ -98,10 +98,10 @@ function Shell() {
     route.page === 'event' ||
     (route.page === 'admin' && Boolean(route.id && adminSession));
   const homePage = route.page === 'home';
-  const pageLook = homePage ? homeLook : eventPage ? eventLook : null;
-  const palette = pageLook ? wallpaperPaletteStyle(pageLook) : undefined;
+  const eventPalette = eventPage ? eventLook : null;
+  const palette = wallpaperPaletteStyle(eventPalette ?? homeLook);
   useEffect(() => {
-    if (homePage) rememberHomeWallpaper(homeLook);
+    rememberSiteWallpaper(homeLook, homePage);
   }, [homePage, homeLook]);
   useEffect(() => {
     if (!eventPage) {
@@ -169,16 +169,15 @@ function Shell() {
   return (
     <div
       data-event-page={eventPage || undefined}
-      data-home-page={homePage || undefined}
-      data-wallpaper-palette={homePage || undefined}
-      data-event-palette={eventPage && palette ? true : undefined}
+      data-site-palette={!eventPalette || undefined}
+      data-event-palette={eventPalette ? true : undefined}
       style={palette}
       className="isolate flex min-h-dvh flex-col"
     >
-      {homePage && (
+      {!eventPalette && (
         <EventWallpaper
           look={homeLook}
-          surface="home"
+          surface={homePage ? 'home' : 'site'}
           className="pointer-events-none fixed inset-0 -z-10"
         />
       )}
