@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TEXTILE_PATTERN_KINDS = [
+const LEGACY_TEXTILE_KINDS = [
   'printed-dots',
   'gingham',
   'stripes',
@@ -13,6 +13,14 @@ export const TEXTILE_PATTERN_KINDS = [
   'houndstooth',
 ] as const;
 
+export const TEXTILE_PATTERN_KINDS = [
+  ...LEGACY_TEXTILE_KINDS,
+  'chevrons',
+  'scallops',
+  'waves',
+  'azulejo',
+] as const;
+
 export const MOTIF_PATTERN_KINDS = [
   'stars',
   'hearts',
@@ -22,6 +30,14 @@ export const MOTIF_PATTERN_KINDS = [
   'drops',
   'petals',
   'rings',
+  'butterflies',
+  'ginkgos',
+  'swallows',
+  'lanterns',
+  'clovers',
+  'shells',
+  'comets',
+  'umbrellas',
 ] as const;
 
 export const PATTERN_KINDS = [
@@ -69,7 +85,7 @@ export function patternFor(id: string, theme?: EventThemeData): Pattern {
   for (const character of identity)
     seed = Math.imul(seed ^ character.charCodeAt(0), 16777619) >>> 0;
   return {
-    kind: TEXTILE_PATTERN_KINDS[seed % TEXTILE_PATTERN_KINDS.length]!,
+    kind: LEGACY_TEXTILE_KINDS[seed % LEGACY_TEXTILE_KINDS.length]!,
     seed,
   };
 }

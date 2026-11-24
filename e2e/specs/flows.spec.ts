@@ -52,6 +52,17 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await picker.getByRole('radio', { name: 'Pattern 3', exact: true }).check();
   const wallpaper = refreshed[2]!;
   await expect(selected).toHaveAttribute('data-pattern', wallpaper);
+  const colorFields = (svg: Locator) =>
+    svg
+      .locator('radialGradient')
+      .evaluateAll((shapes) =>
+        shapes.map((shape) => [
+          shape.getAttribute('gradientTransform'),
+          shape.firstElementChild?.getAttribute('stop-color'),
+        ])
+      );
+  await expect(selected.locator('radialGradient')).toHaveCount(4);
+  const originalFields = await colorFields(selected);
   await page.getByLabel('Place (optional)').fill('North field');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -102,6 +113,12 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   ).toBeVisible();
   const eventWallpaper = page.locator('[data-wallpaper="event"]');
   await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  expect(await colorFields(eventWallpaper)).toEqual(originalFields);
+  await expect(eventWallpaper.locator('feDisplacementMap')).toHaveAttribute(
+    'scale',
+    '108'
+  );
+  await expect(eventWallpaper.locator('rect[filter]')).toHaveCount(1);
   await expect(eventWallpaper.locator('pattern')).toHaveAttribute(
     'patternTransform',
     'scale(.5)'
@@ -163,6 +180,8 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   expect(otherColor).toBeGreaterThanOrEqual(0);
   await editor.getByRole('radio').nth(otherColor).check();
   const replacement = (await preview.getAttribute('data-pattern'))!;
+  const replacementFields = await colorFields(preview);
+  expect(replacementFields).not.toEqual(originalFields);
   await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
   await page.getByRole('button', { name: 'Save pattern' }).click();
   await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
@@ -180,6 +199,7 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   // Participants get the saved wallpaper with their registration view.
   await page.goto(new URL(link).pathname);
   await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  expect(await colorFields(eventWallpaper)).toEqual(replacementFields);
   expect(await themeColor('--owl-brand')).toBe(newAccent);
   await expect(page.getByRole('button', { name: 'Save pattern' })).toHaveCount(
     0

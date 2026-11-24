@@ -5,7 +5,12 @@ import {
   patternFor,
   PATTERN_KINDS,
 } from '../src/event-theme.js';
-import { drawPattern, patternBatch, patternPalette } from '../src/patterns.js';
+import {
+  drawPattern,
+  patternBatch,
+  patternPalette,
+  wallpaperLight,
+} from '../src/patterns.js';
 
 describe('wallpaper recipes', () => {
   it.each(PATTERN_KINDS)(
@@ -63,6 +68,24 @@ describe('wallpaper recipes', () => {
       expect(packed.marks.length).toBeGreaterThan(sparse.marks.length);
     }
   );
+
+  it('recreates the same overlapping colored gradients for a saved seed', () => {
+    const lights = wallpaperLight(86753);
+    expect(wallpaperLight(86753)).toEqual(lights);
+    expect(wallpaperLight(86754)).not.toEqual(lights);
+    expect(lights.map(({ tone }) => tone)).toEqual([
+      'accent',
+      'thread',
+      'ink',
+      'highlight',
+    ]);
+    for (const { x, y, radius, squash, opacity } of lights) {
+      expect([x, y].every((center) => center >= 0 && center <= 1)).toBe(true);
+      expect(radius).toBeGreaterThan(0.5);
+      expect(squash).toBeLessThan(1);
+      expect(opacity).toBeLessThan(0.55);
+    }
+  });
 
   it('restores a saved recipe and gives older events stable wallpapers', () => {
     const legacy = {

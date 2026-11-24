@@ -199,6 +199,38 @@ const MOTIF_PATHS: Record<MotifKind, (pick: Pick) => string> = {
   petals: () =>
     'M0,0C-.87,-.24-.28,-1,0,-.97C.28,-1,.87,-.24,0,0ZM0,0C.24,-.87,1,-.28,.97,0C1,.28,.24,.87,0,0ZM0,0C.87,.24,.28,1,0,.97C-.28,1,-.87,.24,0,0ZM0,0C-.24,.87,-1,.28,-.97,0C-1,-.28,-.24,-.87,0,0Z',
   rings: (pick) => ring(0, 0, 1) + ring(0, 0, pick(37, 70) / 100),
+  butterflies: () =>
+    'M0,-.18C-.23,-.96-.92,-1.07-.97,-.62C-1,-.33-.66,-.05-.44,0C-.96,.17-.89,.75-.53,.8C-.28,.83-.12,.51,0,.19C.12,.51,.28,.83,.53,.8C.89,.75,.96,.17,.44,0C.66,-.05,1,-.33,.97,-.62C.92,-1.07,.23,-.96,0,-.18Z' +
+    'M-.06,.14Q-.19,-.23,0,-.52Q.19,-.23,.06,.14L0,.73Z',
+  ginkgos: () =>
+    'M-.08,.91Q-.2,.49,-.12,.22C-.77,.25-1.08,-.2-.88,-.55C-.7,-.89-.3,-.95,-.02,-.58C.28,-.95,.72,-.88,.89,-.55C1.09,-.18,.73,.26,.03,.23Q-.09,.57,.06,.87Z',
+  swallows: () =>
+    'M-.98,-.65Q-.29,-.78,0,-.22Q.36,-.81,.98,-.66Q.61,-.34,.64,-.06Q.26,.16,.15,.25L.31,.76L0,.49L-.31,.76L-.15,.25Q-.31,.18-.64,-.04Q-.57,-.39-.98,-.65Z',
+  lanterns: () =>
+    'M-.34,-.92H.34V-.74H-.34ZM0,-.65C.47,-.65,.83,-.31,.83,.06C.83,.44,.48,.68,0,.68C-.48,.68-.83,.44-.83,.06C-.83,-.31-.47,-.65,0,-.65Z' +
+    'M-.30,.04C-.30,-.21-.17,-.44,0,-.49C.17,-.44,.30,-.21,.30,.04C.30,.31,.14,.47,0,.52C-.14,.47-.30,.31-.30,.04ZM-.35,.76H.35V.91H-.35Z',
+  clovers: (pick) => {
+    const offset = pick(31, 42) / 100;
+    return (
+      [
+        [offset, offset],
+        [-offset, offset],
+        [-offset, -offset],
+        [offset, -offset],
+      ]
+        .map(([x, y]) => ring(x!, y!, offset))
+        .join('') + ring(0, 0, 0.18)
+    );
+  },
+  shells: () =>
+    'M0,.83L-.78,.14Q-1,-.14-.74,-.39Q-.73,-.7-.39,-.67Q-.28,-.94,0,-.88Q.28,-.94,.39,-.67Q.73,-.7,.74,-.39Q1,-.14,.78,.14Z' +
+    'M-.47,-.39L-.07,.53L-.34,-.51ZM.47,-.39L.07,.53L.34,-.51ZM-.07,-.61L0,.54L.07,-.61Z',
+  comets: (pick) =>
+    'M-.94,.68Q-.64,-.22,.17,-.61Q-.33,-.15-.4,.01Q-.37,.06-.19,.05Q-.53,.41-.94,.68Z' +
+    ring(0.4, -0.38, pick(24, 39) / 100),
+  umbrellas: () =>
+    'M-.92,.04C-.93,-.35-.53,-.79-.05,-.80L-.02,-.94H.12L.14,-.78C.57,-.70,.9,-.33,.91,.04Q.63,-.17,.34,.04Q.06,-.17-.23,.04Q-.56,-.18-.92,.04Z' +
+    'M-.02,-.01H.12V.60Q.12,.83,.35,.75L.39,.88Q-.02,1.03-.02,.63Z',
 };
 
 function motifTile(kind: MotifKind, spacing: Spacing, pick: Pick): Tile {
@@ -480,6 +512,81 @@ function tileFor(
     }
     case 'honeycomb':
       return honeycomb(pick);
+    case 'chevrons': {
+      const half = pick(14, 24);
+      const step = pick(8, 12);
+      const width = half * 4;
+      return {
+        width,
+        height: step * 4,
+        marks: Array.from({ length: 7 }, (_, row) => {
+          const y = (row - 2) * step;
+          return line(
+            `M0,${y}l${half},${step}${half},${-step}${half},${step}${half},${-step}`,
+            row % 2 ? 'accent' : 'ink'
+          );
+        }),
+      };
+    }
+    case 'scallops': {
+      const radius = pick(13, 23);
+      const diameter = radius * 2;
+      const marks: Mark[] = [];
+      for (const [x, y] of [
+        [0, 0],
+        [diameter, 0],
+        [radius, radius],
+        [0, diameter],
+        [diameter, diameter],
+      ] as const) {
+        for (const scale of [0.43, 0.72, 0.96]) {
+          const r = radius * scale;
+          marks.push(
+            line(
+              `M${x - r},${y}a${r},${r} 0 0 1 ${2 * r},0`,
+              scale === 0.72 ? 'accent' : 'ink'
+            )
+          );
+        }
+      }
+      return { width: diameter, height: diameter, marks };
+    }
+    case 'waves': {
+      const width = pick(42, 70);
+      const step = pick(6, 11);
+      const rise = pick(7, 13);
+      return {
+        width,
+        height: step * 6,
+        marks: Array.from({ length: 11 }, (_, row) => {
+          const y = (row - 2) * step;
+          return line(
+            `M0,${y}C${width / 4},${y - rise} ${width / 4},${y - rise} ${width / 2},${y}S${(3 * width) / 4},${y + rise} ${width},${y}`,
+            row % 3 === 0 ? 'thread' : 'ink'
+          );
+        }),
+      };
+    }
+    case 'azulejo': {
+      const side = pick(31, 52);
+      const center = side / 2;
+      const marks: Mark[] = [
+        line(diamond(center, center, center, center), 'ink'),
+        solid(diamond(center, center, side / 9, side / 9), 'thread'),
+      ];
+      for (const angle of [0, 1, 2, 3].map((turn) => (turn * TAU) / 4)) {
+        const tip = point(center, center, side * 0.42, angle);
+        const left = point(center, center, side * 0.25, angle - 0.6);
+        const right = point(center, center, side * 0.25, angle + 0.6);
+        marks.push(
+          solid(
+            `M${center},${center}Q${left} ${tip}Q${right} ${center},${center}Z`,
+            'accent'
+          )
+        );
+      }
+      return { width: side, height: side, marks };
+    }
     case 'houndstooth': {
       const step = pick(3, 6);
       const marks: Mark[] = [];
@@ -510,6 +617,52 @@ function paletteIndex(pattern: Pattern, random: () => number) {
 
 export function patternPalette(pattern: Pattern) {
   return PALETTES[paletteIndex(pattern, seeded(pattern.seed))]!;
+}
+
+/** Layered elliptical color fields, with a separate seed from the tile geometry. */
+export function wallpaperLight(seed: number) {
+  const random = seeded((seed ^ 0x37ecad81) >>> 0);
+  const tilt = 35 + random() * 100;
+  const flip = random() < 0.5 ? 1 : -1;
+  const mirror = (x: number) => (flip > 0 ? x : 1 - x);
+  return [
+    {
+      tone: 'accent',
+      x: mirror(0.1 + random() * 0.22),
+      y: 0.12 + random() * 0.2,
+      radius: 0.71,
+      squash: 0.61,
+      angle: flip * tilt,
+      opacity: 0.51,
+    },
+    {
+      tone: 'thread',
+      x: mirror(0.68 + random() * 0.26),
+      y: 0.63 + random() * 0.21,
+      radius: 0.76,
+      squash: 0.69,
+      angle: flip * (tilt - 29),
+      opacity: 0.42,
+    },
+    {
+      tone: 'ink',
+      x: mirror(0.23 + random() * 0.3),
+      y: 0.79 + random() * 0.18,
+      radius: 0.75,
+      squash: 0.42,
+      angle: flip * (tilt + 17),
+      opacity: 0.49,
+    },
+    {
+      tone: 'highlight',
+      x: mirror(0.54 + random() * 0.24),
+      y: 0.02 + random() * 0.26,
+      radius: 0.69,
+      squash: 0.38,
+      angle: flip * (tilt + 48),
+      opacity: 0.18,
+    },
+  ] as const;
 }
 
 export function drawPattern(pattern: Pattern) {
