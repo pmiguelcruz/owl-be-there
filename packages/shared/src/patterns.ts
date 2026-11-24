@@ -1,21 +1,25 @@
 import {
   MOTIF_PATTERN_KINDS,
   TEXTILE_PATTERN_KINDS,
+  WALLPAPER_GRADIENTS,
   type Pattern,
 } from './event-theme.js';
 
 type Tone = 'ink' | 'accent' | 'thread';
+type Point = readonly [x: number, y: number];
 interface Mark {
   d: string;
   tone: Tone;
   fill?: boolean;
-  transform?: string;
+  center?: Point;
+  rotation?: number;
+  radius?: number;
+  strokeWidth?: number;
 }
 interface Tile {
   width: number;
   height: number;
   marks: Mark[];
-  texture?: string;
   spacing?: Spacing;
 }
 type Pick = (min: number, max: number) => number;
@@ -187,6 +191,7 @@ export function patternBatch(
   ] as const;
   const layouts = shuffled([0, 1, 2, 3, word() % 4], word);
   const wildSlot = includeWild ? word() % kinds.length : -1;
+  const gradients = shuffled(WALLPAPER_GRADIENTS, word);
   return shuffled(
     kinds.map((kind, index) => {
       const random = word() >>> 0;
@@ -196,7 +201,12 @@ export function patternBatch(
           : random;
       const match = previous.find((pattern) => pattern.kind === kind);
       if (match?.seed === seed) seed = (seed + 4) >>> 0;
-      return { kind, seed, ...(index === wildSlot && { wild: true as const }) };
+      return {
+        kind,
+        seed,
+        gradient: gradients[index % gradients.length]!,
+        ...(index === wildSlot && { wild: true as const }),
+      };
     }),
     word
   );
@@ -212,10 +222,13 @@ function seeded(seed: number) {
   };
 }
 
-const line = (d: string, tone: Tone = 'ink'): Mark => ({ d, tone });
-const solid = (d: string, tone: Tone = 'ink'): Mark => ({
+const line = (d: string, tone: Tone = 'ink', center?: Point): Mark => ({
   d,
   tone,
+  ...(center && { center }),
+});
+const solid = (d: string, tone: Tone = 'ink', center?: Point): Mark => ({
+  ...line(d, tone, center),
   fill: true,
 });
 const rectangle = (x: number, y: number, w: number, h: number) =>
@@ -301,21 +314,15 @@ function motifTile(kind: MotifKind, spacing: Spacing, pick: Pick): Tile {
     angle: number,
     tone: Tone
   ) {
-    // Wrap the part of a packed motif that crosses a tile edge.
-    const horizontal =
-      x < radius ? [x, x + side] : x > side - radius ? [x, x - side] : [x];
-    const vertical =
-      y < radius ? [y, y + side] : y > side - radius ? [y, y - side] : [y];
-    for (const left of horizontal) {
-      for (const top of vertical) {
-        marks.push({
-          d,
-          tone,
-          fill: true,
-          transform: `translate(${left.toFixed(2)} ${top.toFixed(2)}) rotate(${angle}) scale(${radius.toFixed(2)})`,
-        });
-      }
-    }
+    const wrap = (coordinate: number) => (coordinate + side) % side;
+    marks.push({
+      d,
+      tone,
+      fill: true,
+      center: [wrap(x), wrap(y)],
+      rotation: angle,
+      radius,
+    });
   }
 
   for (let row = 0; row < 2; row += 1) {
@@ -349,33 +356,16 @@ function printedDots(pick: Pick): Tile {
   const pitch = pick(23, 31);
   const tones = ['ink', 'accent', 'thread'] as const;
   const marks: Mark[] = [];
-  const texture: string[] = [];
+
   for (let row = 0; row < 4; row += 1) {
     for (let column = 0; column < 4; column += 1) {
       const x = (column + (row % 2 ? 0.58 : 0.42)) * pitch + pick(-2, 2);
       const y = (row + 0.5) * pitch + pick(-2, 2);
       const radius = pick(Math.floor(pitch / 5), Math.floor(pitch / 3));
-      marks.push(solid(ring(x, y, radius), tones[pick(0, 2)]!));
-      const spacing = pick(2, 3);
-      for (let dy = 1 - radius; dy < radius; dy += spacing) {
-        for (
-          let dx = 1 - radius + Math.abs(dy % 2);
-          dx < radius;
-          dx += spacing
-        ) {
-          if (Math.hypot(dx, dy) < radius - 1)
-            texture.push(`M${x + dx},${y + dy}l.7,-.7`);
-        }
-      }
+      marks.push(solid(ring(x, y, radius), tones[pick(0, 2)]!, [x, y]));
     }
   }
-  // Tiny dark cuts suggest the uneven ink coverage of a printed fabric.
-  return {
-    width: pitch * 4,
-    height: pitch * 4,
-    marks,
-    texture: texture.join(''),
-  };
+  return { width: pitch * 4, height: pitch * 4, marks };
 }
 
 function spirals(pick: Pick): Tile {
@@ -397,7 +387,8 @@ function spirals(pick: Pick): Tile {
     });
     return line(
       `M${curve.join('L')}`,
-      index === 0 || index === 3 ? 'accent' : 'thread'
+      index === 0 || index === 3 ? 'accent' : 'thread',
+      [x, y]
     );
   });
   return { width: size * 2, height: size * 2, marks };
@@ -429,10 +420,10 @@ function blossoms(pick: Pick): Tile {
         return `M${root}Q${left} ${tip}Q${right} ${root}Z`;
       }).join('');
     const tone = row ? 'accent' : 'ink';
-    marks.push(solid(flower(x), tone), solid(ring(x, y, 1.7), 'thread'));
-    // Repeat the portion of each outer blossom cut by the tile edge.
-    if (column === 0) marks.push(solid(flower(x + size * 2), tone));
-    if (column === 1.5) marks.push(solid(flower(x - size * 2), tone));
+    marks.push(
+      solid(flower(x), tone, [x, y]),
+      solid(ring(x, y, 1.7), 'thread', [x, y])
+    );
   }
   return { width: size * 2, height: size * 2, marks };
 }
@@ -444,12 +435,8 @@ function honeycomb(pick: Pick): Tile {
   for (const [column, row] of [
     [0, 0],
     [1, 0],
-    [2, 0],
     [0.5, 1],
     [1.5, 1],
-    [0, 2],
-    [1, 2],
-    [2, 2],
   ] as const) {
     const x = column * step;
     const y = row * r * 1.5;
@@ -458,9 +445,9 @@ function honeycomb(pick: Pick): Tile {
         point(x, y, radius, TAU * (index / 6 + 0.25))
       ).join('L')}Z`;
     marks.push(
-      line(hexagon(r - 0.7), 'accent'),
-      line(hexagon(r - 3.4)),
-      solid(ring(x, y, 1.4), 'thread')
+      line(hexagon(r - 0.7), 'accent', [x, y]),
+      line(hexagon(r - 3.4), 'ink', [x, y]),
+      solid(ring(x, y, 1.4), 'thread', [x, y])
     );
   }
   return { width: step * 2, height: r * 3, marks };
@@ -480,26 +467,32 @@ function tileFor(
         width: side,
         height: side,
         marks: [
-          solid(rectangle(0, step, step, step)),
-          solid(rectangle(step, 0, step, step)),
-          solid(rectangle(step, step, step, step), 'accent'),
+          solid(rectangle(0, step, step, step), 'ink', [step / 2, 1.5 * step]),
+          solid(rectangle(step, 0, step, step), 'ink', [1.5 * step, step / 2]),
+          solid(rectangle(step, step, step, step), 'accent', [
+            1.5 * step,
+            1.5 * step,
+          ]),
         ],
       };
     }
     case 'stripes': {
       const step = pick(15, 29);
       const vertical = pick(0, 1) === 1;
-      const band = (offset: number, width: number) =>
-        vertical
-          ? rectangle(offset, 0, width, step)
-          : rectangle(0, offset, step, width);
+      const band = (offset: number, width: number, tone: Tone): Mark => ({
+        ...line(
+          vertical ? `M${offset},-1v${step + 2}` : `M-1,${offset}h${step + 2}`,
+          tone
+        ),
+        strokeWidth: width,
+      });
       return {
         width: step,
         height: step,
         marks: [
-          solid(band(0, Math.floor(step / 3))),
-          solid(band(Math.floor(step / 2), pick(1, 3)), 'accent'),
-          solid(band(step - 3, 1), 'thread'),
+          band(Math.floor(step / 5), Math.floor(step / 3), 'ink'),
+          band(Math.floor(step / 2), pick(2, 4), 'accent'),
+          band(step - 3, 2, 'thread'),
         ],
       };
     }
@@ -511,8 +504,11 @@ function tileFor(
         width: side,
         height: side,
         marks: [
-          solid(rectangle(0, 0, step, step), tone),
-          solid(rectangle(step, step, step, step), tone),
+          solid(rectangle(0, 0, step, step), tone, [step / 2, step / 2]),
+          solid(rectangle(step, step, step, step), tone, [
+            1.5 * step,
+            1.5 * step,
+          ]),
         ],
       };
     }
@@ -524,23 +520,13 @@ function tileFor(
       const width = pick(17, 29);
       const height = pick(15, 25);
       const marks: Mark[] = [];
-      for (const [x, y] of [
-        [0, 0],
-        [2, 0],
-        [1, 1],
-        [0, 2],
-        [2, 2],
-      ] as const) {
+      for (const offset of [0, 1]) {
+        const x = offset * width;
+        const y = offset * height;
         marks.push(
-          line(diamond(x * width, y * height, width - 1, height - 1), 'ink'),
-          line(
-            diamond(x * width, y * height, width * 0.7, height * 0.7),
-            'accent'
-          ),
-          solid(
-            diamond(x * width, y * height, width * 0.32, height * 0.32),
-            'thread'
-          )
+          line(diamond(x, y, width - 1, height - 1), 'ink', [x, y]),
+          line(diamond(x, y, width * 0.7, height * 0.7), 'accent', [x, y]),
+          solid(diamond(x, y, width * 0.32, height * 0.32), 'thread', [x, y])
         );
       }
       return { width: width * 2, height: height * 2, marks };
@@ -554,8 +540,8 @@ function tileFor(
         marks: [
           line(`M0,0L${side},${side}M${side},0L0,${side}`, 'accent'),
           line(`M0,${step}L${step},0L${side},${step}L${step},${side}Z`),
-          solid(diamond(step / 2, step, 2, 2), 'thread'),
-          solid(diamond(step * 1.5, step, 2, 2), 'thread'),
+          solid(diamond(step / 2, step, 2, 2), 'thread', [step / 2, step]),
+          solid(diamond(step * 1.5, step, 2, 2), 'thread', [step * 1.5, step]),
         ],
       };
     }
@@ -583,17 +569,15 @@ function tileFor(
       const marks: Mark[] = [];
       for (const [x, y] of [
         [0, 0],
-        [diameter, 0],
         [radius, radius],
-        [0, diameter],
-        [diameter, diameter],
       ] as const) {
         for (const scale of [0.43, 0.72, 0.96]) {
           const r = radius * scale;
           marks.push(
             line(
               `M${x - r},${y}a${r},${r} 0 0 1 ${2 * r},0`,
-              scale === 0.72 ? 'accent' : 'ink'
+              scale === 0.72 ? 'accent' : 'ink',
+              [x, y]
             )
           );
         }
@@ -621,7 +605,10 @@ function tileFor(
       const center = side / 2;
       const marks: Mark[] = [
         line(diamond(center, center, center, center), 'ink'),
-        solid(diamond(center, center, side / 9, side / 9), 'thread'),
+        solid(diamond(center, center, side / 9, side / 9), 'thread', [
+          center,
+          center,
+        ]),
       ];
       for (const angle of [0, 1, 2, 3].map((turn) => (turn * TAU) / 4)) {
         const tip = point(center, center, side * 0.42, angle);
@@ -630,7 +617,8 @@ function tileFor(
         marks.push(
           solid(
             `M${center},${center}Q${left} ${tip}Q${right} ${center},${center}Z`,
-            'accent'
+            'accent',
+            [center, center]
           )
         );
       }
@@ -648,7 +636,8 @@ function tileFor(
             marks.push(
               solid(
                 rectangle(column * step, row * step, step, step),
-                darkWarp && darkWeft ? 'accent' : 'ink'
+                darkWarp && darkWeft ? 'accent' : 'ink',
+                [(column + 0.5) * step, (row + 0.5) * step]
               )
             );
           }
@@ -714,6 +703,76 @@ export function wallpaperLight(seed: number, wild = false) {
       opacity: wild ? 0.78 : 0.42,
     },
   ] as const;
+}
+
+/** Endpoints and centers use the same normalized coordinates as the SVG. */
+export function wallpaperGradient(pattern: Pattern) {
+  const random = seeded((pattern.seed ^ 0x83ddc9cd) >>> 0);
+  const style = pattern.gradient ?? 'flow';
+  if (style === 'linear') {
+    const angle = (Math.floor(random() * 12) * TAU) / 12;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const extent = (Math.abs(dx) + Math.abs(dy)) / 2;
+    const from: Point = [0.5 - dx * extent, 0.5 - dy * extent];
+    const to: Point = [0.5 + dx * extent, 0.5 + dy * extent];
+    return { style, from, to } as const;
+  }
+  if (style === 'radial') {
+    const center: Point = [0.18 + random() * 0.64, 0.18 + random() * 0.64];
+    return { style, center, radius: 0.75 + random() * 0.25 } as const;
+  }
+  return { style, lights: wallpaperLight(pattern.seed, pattern.wild) } as const;
+}
+
+export type WallpaperGradient = ReturnType<typeof wallpaperGradient>;
+
+const smooth = (value: number) => {
+  const t = Math.max(0, Math.min(value, 1));
+  return t * t * (3 - 2 * t);
+};
+
+/** Measures the same bands and pools of color that the wallpaper draws. */
+export function wallpaperGrowth(gradient: WallpaperGradient) {
+  switch (gradient.style) {
+    case 'linear': {
+      const [sx, sy] = gradient.from;
+      const dx = gradient.to[0] - sx;
+      const dy = gradient.to[1] - sy;
+      const length = dx * dx + dy * dy;
+      return (x: number, y: number) =>
+        0.62 +
+        0.76 *
+          smooth(
+            1 - Math.abs((dx * (x - sx) + dy * (y - sy)) / length - 0.54) / 0.54
+          );
+    }
+    case 'radial': {
+      const [cx, cy] = gradient.center;
+      return (x: number, y: number) =>
+        0.62 + 0.76 * smooth(1 - Math.hypot(x - cx, y - cy) / gradient.radius);
+    }
+    case 'flow': {
+      const fields = gradient.lights.map((light) => ({
+        ...light,
+        cos: Math.cos((light.angle * TAU) / 360),
+        sin: Math.sin((light.angle * TAU) / 360),
+      }));
+      return (x: number, y: number) => {
+        let remaining = 1;
+        for (const field of fields) {
+          const dx = x - field.x;
+          const dy = y - field.y;
+          const major = dx * field.cos + dy * field.sin;
+          const minor = (dy * field.cos - dx * field.sin) / field.squash;
+          remaining *=
+            1 -
+            field.opacity * smooth(1 - Math.hypot(major, minor) / field.radius);
+        }
+        return 0.62 + 0.86 * smooth((1 - remaining) * 1.24);
+      };
+    }
+  }
 }
 
 export function drawPattern(pattern: Pattern) {

@@ -52,16 +52,30 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await picker.getByRole('radio', { name: /^Pattern 3\b/ }).check();
   const wallpaper = refreshed[2]!;
   await expect(selected).toHaveAttribute('data-pattern', wallpaper);
-  const colorFields = (svg: Locator) =>
-    svg
-      .locator('radialGradient')
-      .evaluateAll((shapes) =>
-        shapes.map((shape) => [
-          shape.getAttribute('gradientTransform'),
-          shape.firstElementChild?.getAttribute('stop-color'),
-        ])
-      );
-  await expect(selected.locator('radialGradient')).toHaveCount(4);
+  const colorsOf = (wallpaper: Locator) =>
+    wallpaper.locator('linearGradient, radialGradient');
+  const colorFields = (wallpaper: Locator) =>
+    colorsOf(wallpaper).evaluateAll((shapes) =>
+      shapes.map((shape) => ({
+        tag: shape.tagName,
+        attrs: Array.from(shape.attributes)
+          .filter(({ name }) => name !== 'id')
+          .map(({ name, value }) => [name, value]),
+        stops: Array.from(shape.children).map((stop) => stop.outerHTML),
+      }))
+    );
+  const styles = await picker
+    .locator('label [data-gradient]')
+    .evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-gradient'))
+    );
+  expect(new Set(styles)).toEqual(new Set(['linear', 'radial', 'flow']));
+  const gradientStyle = await selected.getAttribute('data-gradient');
+  await expect(colorsOf(selected)).toHaveCount(
+    gradientStyle === 'flow' ? 4 : 1
+  );
+  if (gradientStyle === 'linear')
+    await expect(selected.locator('radialGradient')).toHaveCount(0);
   const originalFields = await colorFields(selected);
   await page.getByLabel('Place (optional)').fill('North field');
   await page.getByRole('button', { name: 'Next' }).click();
@@ -114,23 +128,18 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   const eventWallpaper = page.locator('[data-wallpaper="event"]');
   await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
   expect(await colorFields(eventWallpaper)).toEqual(originalFields);
-  await expect(eventWallpaper.locator('feDisplacementMap')).toHaveAttribute(
-    'scale',
-    '108'
-  );
-  await expect(eventWallpaper.locator('rect[filter]')).toHaveCount(1);
-  await expect(eventWallpaper.locator('pattern')).toHaveAttribute(
-    'patternTransform',
-    'scale(.1)'
-  );
-  await expect(eventWallpaper.locator('pattern g')).toHaveAttribute(
-    'opacity',
-    (await eventWallpaper.getAttribute('data-wild')) === 'true'
-      ? '0.65'
-      : (await eventWallpaper.getAttribute('data-spacing')) === 'packed'
-        ? '0.31'
-        : '0.42'
-  );
+  await expect(eventWallpaper).toHaveAttribute('data-repeat-scale', '0.5');
+  await expect(eventWallpaper).toHaveAttribute('data-gradient', gradientStyle!);
+  await expect
+    .poll(() =>
+      eventWallpaper.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
+        canvas
+          .getContext('2d')!
+          .getImageData(0, 0, canvas.width, canvas.height)
+          .data.some((channel, index) => index % 4 === 3 && channel > 0)
+      )
+    )
+    .toBe(true);
   const colors = page.locator('[data-event-palette]');
   const themeColor = (token: string) =>
     colors.evaluate(

@@ -11,7 +11,12 @@ export function randomPatterns(previous: readonly Pattern[] = []): Pattern[] {
 }
 
 export function samePattern(a: Pattern, b: Pattern): boolean {
-  return a.kind === b.kind && a.seed === b.seed && a.wild === b.wild;
+  return (
+    a.kind === b.kind &&
+    a.seed === b.seed &&
+    a.wild === b.wild &&
+    (a.gradient ?? 'flow') === (b.gradient ?? 'flow')
+  );
 }
 
 export function PatternPicker({
@@ -87,7 +92,7 @@ export function PatternPicker({
                 <EventWallpaper
                   pattern={pattern}
                   className="block size-full"
-                  preview
+                  surface="preview"
                 />
               </span>
             </label>
@@ -99,7 +104,7 @@ export function PatternPicker({
         <EventWallpaper
           pattern={selected}
           className="block h-24 w-full"
-          preview
+          surface="preview"
         />
       </figure>
     </div>

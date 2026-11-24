@@ -10,6 +10,8 @@ import {
   patternBatch,
   patternPalette,
   wallpaperLight,
+  wallpaperGradient,
+  wallpaperGrowth,
 } from '../src/patterns.js';
 
 describe('wallpaper recipes', () => {
@@ -41,6 +43,9 @@ describe('wallpaper recipes', () => {
     for (const batch of [first, second]) {
       expect(batch).toHaveLength(10);
       expect(new Set(batch.map(({ kind }) => kind)).size).toBe(10);
+      expect(new Set(batch.map(({ gradient }) => gradient))).toEqual(
+        new Set(['flow', 'linear', 'radial'])
+      );
       expect(extremes(batch)).toEqual(
         new Set([undefined, 'sparse', 'airy', 'clustered', 'packed'])
       );
@@ -81,7 +86,10 @@ describe('wallpaper recipes', () => {
       expect(sparse.spacing).toBe('sparse');
       expect(packed.spacing).toBe('packed');
       expect(sparse.width).toBeGreaterThan(packed.width * 3);
-      expect(packed.marks.length).toBeGreaterThan(sparse.marks.length);
+      expect(packed.marks).toHaveLength(sparse.marks.length);
+      expect(packed.marks.every((mark) => mark.center && mark.radius)).toBe(
+        true
+      );
     }
   );
 
@@ -107,6 +115,32 @@ describe('wallpaper recipes', () => {
       expect(squash).toBeLessThan(1);
       expect(opacity).toBeLessThan(0.8);
     }
+  });
+
+  it('scales marks along a straight gradient and around the center of a radial gradient', () => {
+    const pattern = { kind: 'stars', seed: 540 } as const;
+    const linear = wallpaperGradient({ ...pattern, gradient: 'linear' });
+    const radial = wallpaperGradient({ ...pattern, gradient: 'radial' });
+    if (linear.style !== 'linear' || radial.style !== 'radial')
+      throw new Error('Unexpected wallpaper gradient');
+    const growLinear = wallpaperGrowth(linear);
+    const growRadial = wallpaperGrowth(radial);
+    const [x, y] = linear.from;
+    const dx = linear.to[0] - x;
+    const dy = linear.to[1] - y;
+    const middle = [x + dx * 0.54, y + dy * 0.54] as const;
+    expect(growLinear(...middle)).toBeGreaterThan(growLinear(x, y));
+    expect(growLinear(middle[0] - dy * 0.1, middle[1] + dx * 0.1)).toBeCloseTo(
+      growLinear(...middle)
+    );
+    const [cx, cy] = radial.center;
+    expect(growRadial(cx, cy)).toBeGreaterThan(
+      growRadial(cx + radial.radius * 0.5, cy)
+    );
+    expect(growRadial(cx + radial.radius * 0.5, cy)).toBeCloseTo(
+      growRadial(cx, cy - radial.radius * 0.5)
+    );
+    expect(wallpaperGradient(pattern).style).toBe('flow');
   });
 
   it('restores a saved recipe and gives older events stable wallpapers', () => {

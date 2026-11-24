@@ -43,6 +43,25 @@ test('the public home is only the saved events list and the header opens About',
   await expect(header.locator('.owl-eyes')).toHaveCount(1);
 });
 
+test('the homepage rotates both its pattern and gradient on refresh', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const home = page.locator('[data-wallpaper="home"]');
+  await expect(home).toBeVisible();
+  const original = (await home.getAttribute('data-pattern'))!.split(':')[0]!;
+  const style = (await home.getAttribute('data-gradient'))!;
+  await page.reload();
+  await expect(home).toBeVisible();
+  expect((await home.getAttribute('data-pattern'))!.split(':')[0]).not.toBe(
+    original
+  );
+  await expect(home).not.toHaveAttribute('data-gradient', style);
+  await expect(
+    page.getByText('Your event list is empty.', { exact: false })
+  ).toBeVisible();
+});
+
 test('admin unlock rejects an incorrect PIN and a reload locks the page', async ({
   page,
 }) => {

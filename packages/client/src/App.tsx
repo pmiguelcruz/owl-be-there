@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Owl } from './components/Owl.tsx';
+import { EventWallpaper } from './components/EventWallpaper.tsx';
 import { buttonClass, Notice } from './components/ui.tsx';
 import { I18nProvider, useI18n } from './i18n/index.tsx';
 import type { LanguageStore } from './lib/languageStore.ts';
@@ -22,7 +23,11 @@ import {
   type InstanceState,
 } from './lib/instanceStore.ts';
 import { OWL_ICON, setFavicon } from './lib/favicon.ts';
-import { wallpaperPaletteStyle } from './lib/wallpaperPalette.ts';
+import {
+  newHomeWallpaper,
+  rememberHomeWallpaper,
+  wallpaperPaletteStyle,
+} from './lib/wallpaperPalette.ts';
 import { usePathname } from './hooks/usePathname.ts';
 import { headingKey, navigate, parseRoute, placeOf } from './lib/route.ts';
 import { AdminPage } from './pages/AdminPage.tsx';
@@ -67,6 +72,7 @@ function Shell() {
   const instance = instanceState.info;
   const [adminSession, setAdminSession] = useState<string | null>(null);
   const [eventPattern, setEventPattern] = useState<Pattern | null>(null);
+  const [homePattern] = useState(newHomeWallpaper);
   const clearAdmin = useCallback(() => setAdminSession(null), []);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
@@ -91,8 +97,12 @@ function Shell() {
   const eventPage =
     route.page === 'event' ||
     (route.page === 'admin' && Boolean(route.id && adminSession));
-  const palette =
-    eventPage && eventPattern ? wallpaperPaletteStyle(eventPattern) : undefined;
+  const homePage = route.page === 'home';
+  const pagePattern = homePage ? homePattern : eventPage ? eventPattern : null;
+  const palette = pagePattern ? wallpaperPaletteStyle(pagePattern) : undefined;
+  useEffect(() => {
+    if (homePage) rememberHomeWallpaper(homePattern);
+  }, [homePage, homePattern]);
   useEffect(() => {
     if (!eventPage) {
       document.title = heading
@@ -159,10 +169,19 @@ function Shell() {
   return (
     <div
       data-event-page={eventPage || undefined}
-      data-event-palette={palette ? true : undefined}
+      data-home-page={homePage || undefined}
+      data-wallpaper-palette={homePage || undefined}
+      data-event-palette={eventPage && palette ? true : undefined}
       style={palette}
       className="isolate flex min-h-dvh flex-col"
     >
+      {homePage && (
+        <EventWallpaper
+          pattern={homePattern}
+          surface="home"
+          className="pointer-events-none fixed inset-0 -z-10"
+        />
+      )}
       <Header />
       <main
         ref={mainRef}

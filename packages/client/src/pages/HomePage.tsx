@@ -43,6 +43,10 @@ export function HomePage() {
   if (error) return <Notice tone="error">{t('home.eventsUnavailable')}</Notice>;
   if (!events) return null;
   if (!events.length)
-    return <p className="max-w-prose text-muted">{t('home.noEvents')}</p>;
+    return (
+      <p className="max-w-prose rounded-3xl border border-line bg-surface px-5 py-4 text-muted shadow-card">
+        {t('home.noEvents')}
+      </p>
+    );
   return <EventList events={events} />;
 }

@@ -97,7 +97,7 @@
   }
 }
 
-:root:has([data-event-page]),
+:root:has([data-event-page], [data-home-page]),
 :root[data-theme='dark'] {
   color-scheme: dark;
   --owl-bg: #16182b;
@@ -179,7 +179,7 @@
   color: var(--owl-ink);
 }
 
-[data-event-palette] .site-wordmark {
+:is([data-event-palette], [data-home-page]) .site-wordmark {
   background: var(--owl-surface);
   padding-inline: 0.25rem 0.65rem;
 }

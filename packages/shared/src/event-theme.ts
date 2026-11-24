@@ -45,10 +45,13 @@ export const PATTERN_KINDS = [
   ...MOTIF_PATTERN_KINDS,
 ] as const;
 
+export const WALLPAPER_GRADIENTS = ['flow', 'linear', 'radial'] as const;
+
 export const PatternSpec = z.strictObject({
   kind: z.enum(PATTERN_KINDS),
   seed: z.int().min(0).max(0xffff_ffff),
   wild: z.literal(true).optional(),
+  gradient: z.enum(WALLPAPER_GRADIENTS).optional(),
 });
 
 export type Pattern = z.infer<typeof PatternSpec>;
