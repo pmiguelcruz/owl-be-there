@@ -11,10 +11,11 @@ import {
   myCalendar,
   openAsOrganiser,
   organiserTools,
-  saved,
   showView,
   snapshot,
   storedAdminKey,
+  startWizard,
+  unlockAdmin,
   utcDateOf,
 } from '../helpers.ts';
 
@@ -23,10 +24,54 @@ const D = (offset: number) => dayFromNow(offset);
 test('an organiser creates an event with the wizard and gets the share sheet', async ({
   page,
 }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Plan an event' }).click();
+  await startWizard(page);
   await page.getByLabel('Title').fill('Five-a-side');
-  await page.getByRole('radio', { name: 'Football' }).click();
+  const gradients = page.getByRole('group', { name: 'Gradients' });
+  const shapes = page.getByRole('group', { name: 'Wallpaper shapes' });
+  await expect(gradients.getByRole('radio')).toHaveCount(10);
+  await expect(shapes.getByRole('radio')).toHaveCount(5);
+  const originalColors = await gradients
+    .locator('stop')
+    .evaluateAll((stops) =>
+      stops.map((stop) => stop.getAttribute('stop-color'))
+    );
+  const originalPaths = await shapes
+    .locator('path')
+    .evaluateAll((paths) => paths.map((path) => path.getAttribute('d')));
+  await gradients.getByRole('button', { name: 'Refresh gradients' }).click();
+  await shapes.getByRole('button', { name: 'Refresh shapes' }).click();
+  expect(
+    await gradients
+      .locator('stop')
+      .evaluateAll((stops) =>
+        stops.map((stop) => stop.getAttribute('stop-color'))
+      )
+  ).not.toEqual(originalColors);
+  expect(
+    await shapes
+      .locator('path')
+      .evaluateAll((paths) => paths.map((path) => path.getAttribute('d')))
+  ).not.toEqual(originalPaths);
+  const chosenGradient = gradients.getByRole('radio', {
+    name: 'Gradient 3',
+    exact: true,
+  });
+  const chosenShape = shapes.getByRole('radio', {
+    name: 'Shape 2',
+    exact: true,
+  });
+  await chosenGradient.check();
+  await chosenShape.check();
+  const preview = page
+    .locator('svg')
+    .filter({ has: page.locator('pattern') })
+    .last();
+  const wallpaper = await preview.locator('pattern path').getAttribute('d');
+  const colors = await preview
+    .locator('stop')
+    .evaluateAll((stops) =>
+      stops.map((stop) => stop.getAttribute('stop-color'))
+    );
   await page.getByLabel('Place (optional)').fill('North field');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -76,38 +121,36 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await expect(
     page.getByRole('heading', { name: 'Five-a-side' })
   ).toBeVisible();
+  const eventWallpaper = page
+    .locator('main svg')
+    .filter({ has: page.locator('pattern') });
+  await expect(eventWallpaper.locator('pattern path')).toHaveAttribute(
+    'd',
+    wallpaper!
+  );
+  expect(
+    await eventWallpaper
+      .locator('stop')
+      .evaluateAll((stops) =>
+        stops.map((stop) => stop.getAttribute('stop-color'))
+      )
+  ).toEqual(colors);
+
+  await page.reload();
+  await expect(eventWallpaper.locator('pattern path')).toHaveAttribute(
+    'd',
+    wallpaper!
+  );
   await expect(page.getByText('2 days in a row')).toBeVisible();
   expect(new URL(page.url()).hash).toBe('');
   await showView(page, 'mine');
   await expect(page.getByRole('button', { name: 'Anna' })).toBeVisible();
 });
 
-test('focus that moves into the wizard right after opening is not pulled away', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const kept = await page.evaluate(async () => {
-    const cta = [...document.querySelectorAll('button')].find(
-      (button) => button.textContent?.trim() === 'Plan an event'
-    );
-    cta?.click();
-    // React renders the wizard in a microtask: wait for it, not for a frame.
-    await Promise.resolve();
-    const title = document.querySelector<HTMLInputElement>('form input');
-    title?.focus();
-    for (let frame = 0; frame < 3; frame += 1) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    }
-    return title !== null && document.activeElement === title;
-  });
-  expect(kept).toBe(true);
-});
-
 test('changing the range keeps the days the organiser already chose', async ({
   page,
 }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Plan an event' }).click();
+  await startWizard(page);
   await page.getByLabel('Title').fill('Book club');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -144,8 +187,7 @@ test('changing the range keeps the days the organiser already chose', async ({
 test('changing the weekdays keeps the days the organiser already chose', async ({
   page,
 }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Plan an event' }).click();
+  await startWizard(page);
   await page.getByLabel('Title').fill('Book club');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -274,139 +316,6 @@ test('the tab shows the open event’s emoji once, and the owl elsewhere', async
   await expect(page.locator('link[rel="icon"]')).toHaveCount(1);
 });
 
-test('the start page example can be tried, sends nothing, and starts over', async ({
-  page,
-}, testInfo) => {
-  const calls: string[] = [];
-  page.on('request', (request) => {
-    if (new URL(request.url()).pathname.startsWith('/api/events'))
-      calls.push(request.url());
-  });
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Try it out' })).toBeVisible();
-  const frame = page.locator('[data-browser-frame]');
-  await expect(frame.getByText('Team dinner · Owl Be There')).toBeVisible();
-  const mine = frame.getByRole('grid', { name: 'My days' });
-  const tab = (name: 'My days' | 'Group') =>
-    frame.getByRole('tab', { name: new RegExp(`^${name}`) });
-  const mobile = isMobile(testInfo);
-  if (mobile) await expect(tab('Group')).toBeVisible();
-  else await expect(frame.getByRole('tab')).toHaveCount(0);
-
-  // A Monday in the second week: Anna has said nothing about it yet.
-  const days = await mine
-    .locator('[data-day]')
-    .evaluateAll((cells) =>
-      cells.map((cell) => cell.getAttribute('data-day')!)
-    );
-  const monday = days.find(
-    (iso) => utcDateOf(iso).getUTCDay() === 1 && Number(iso.slice(8)) >= 8
-  )!;
-  const canOn = async () => {
-    if (mobile) await tab('Group').click();
-    const label =
-      (await day(
-        frame.getByRole('grid', { name: 'Group' }),
-        monday
-      ).getAttribute('aria-label')) ?? '';
-    if (mobile) await tab('My days').click();
-    return Number(/(\d+) can/.exec(label)![1]);
-  };
-  const before = await canOn();
-
-  await day(mine, monday).click();
-  await expect.poll(canOn).toBe(before + 1);
-  await frame.getByRole('button', { name: 'Start over' }).click();
-  await expect.poll(canOn).toBe(before);
-  await expect(
-    frame.getByRole('button', { name: 'Start over' })
-  ).toBeDisabled();
-  expect(calls).toEqual([]);
-});
-
-test('the start page example shows two notes in the day sheet', async ({
-  page,
-}, testInfo) => {
-  const calls: string[] = [];
-  page.on('request', (request) => {
-    if (new URL(request.url()).pathname.startsWith('/api/events'))
-      calls.push(request.url());
-  });
-  await page.goto('/');
-  const frame = page.locator('[data-browser-frame]');
-  if (isMobile(testInfo))
-    await frame.getByRole('tab', { name: /^Group/ }).click();
-  const group = frame.getByRole('grid', { name: 'Group' });
-  // A Thursday from the middle of the month: Max can, Ben maybe.
-  const days = await group
-    .locator('[data-day]')
-    .evaluateAll((cells) =>
-      cells.map((cell) => cell.getAttribute('data-day')!)
-    );
-  const thursday = days.find(
-    (iso) => utcDateOf(iso).getUTCDay() === 4 && Number(iso.slice(8)) >= 15
-  )!;
-  await day(group, thursday).click();
-
-  const BEN = 'Weekdays are tight for me — Thursdays maybe, from mid-month.';
-  const MAX = 'Choir on Thursdays until mid-month, after that I’m free.';
-  const sheet = page.getByRole('dialog');
-  const section = (name: RegExp) =>
-    sheet
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { level: 3, name }) });
-  // The groups name people only; the notes have their own block at the end.
-  await expect(section(/^Maybe\b/).getByRole('listitem')).toHaveText(['Ben']);
-  await expect(section(/^Can\b/).getByText('Choir')).toHaveCount(0);
-  const notes = section(/^Notes · 2$/);
-  // Each name carries its answer for the day, for those who cannot see colour.
-  await expect(notes.getByRole('listitem')).toHaveText([
-    `Ben (Maybe)${BEN}`,
-    `Max (Can)${MAX}`,
-  ]);
-  await sheet.getByRole('button', { name: 'Close' }).click();
-
-  // The group view marks who wrote one and lists the notes under the names.
-  const chip = (name: string) =>
-    frame.getByRole('button', { name, exact: true });
-  await expect(chip('Ben').locator('svg')).toHaveCount(1);
-  await expect(chip('Max').locator('svg')).toHaveCount(1);
-  await expect(chip('Anna').locator('svg')).toHaveCount(0);
-  // The notes have a heading of their own, below "Who is counted".
-  await expect(
-    frame.getByRole('heading', { level: 4, name: 'Notes' })
-  ).toBeVisible();
-  const list = frame.getByRole('list', { name: 'Notes' }).getByRole('listitem');
-  await expect(list).toHaveText([`Ben: ${BEN}`, `Max: ${MAX}`]);
-
-  // Someone left out of the count keeps their note, here and on the day.
-  await chip('Ben').click();
-  await expect(chip('Ben')).toHaveAttribute('aria-pressed', 'false');
-  await expect(list).toHaveText([`Ben: ${BEN}`, `Max: ${MAX}`]);
-  await day(group, thursday).click();
-  await expect(section(/^Maybe\b/).getByRole('heading')).toHaveText(
-    'Maybe · 0'
-  );
-  await expect(notes.getByRole('listitem')).toHaveText([
-    `Ben (Maybe)${BEN}`,
-    `Max (Can)${MAX}`,
-  ]);
-  expect(calls).toEqual([]);
-});
-
-test('the start page example speaks the chosen language', async ({ page }) => {
-  await page.goto('/');
-  await page.getByLabel('Language').selectOption('de');
-  await expect(
-    page
-      .locator('[data-browser-frame]')
-      .getByText('Team-Abendessen · Owl Be There')
-  ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Probier es aus' })
-  ).toBeVisible();
-});
-
 test('everything clickable shows the hand, and a disabled button does not', async ({
   page,
   request,
@@ -415,10 +324,10 @@ test('everything clickable shows the hand, and a disabled button does not', asyn
   const cursor = (locator: Locator) =>
     locator.evaluate((element) => getComputedStyle(element).cursor);
 
-  await page.goto('/');
-  expect(
-    await cursor(page.getByRole('button', { name: 'Plan an event' }))
-  ).toBe('pointer');
+  await page.goto('/about');
+  expect(await cursor(page.getByRole('link', { name: 'Admin' }))).toBe(
+    'pointer'
+  );
   expect(await cursor(page.getByLabel('Language'))).toBe('pointer');
   expect(await cursor(page.getByRole('link').first())).toBe('pointer');
 
@@ -448,7 +357,7 @@ test('a select keeps its shape on focus and draws its own arrow', async ({
       };
     });
 
-  await page.goto('/');
+  await page.goto('/about');
   for (const name of ['Language', 'Theme']) {
     const select = page.getByLabel(name);
     const before = await style(select);
@@ -461,10 +370,10 @@ test('a select keeps its shape on focus and draws its own arrow', async ({
   }
 
   // Something without a rounding of its own still gets a rounded ring.
-  const privacy = page.getByRole('link', { name: 'Privacy' });
+  const source = page.getByRole('link', { name: 'Crab Fit' });
   await page.keyboard.press('Tab');
-  await privacy.focus();
-  expect(await style(privacy)).toMatchObject({
+  await source.focus();
+  expect(await style(source)).toMatchObject({
     focusVisible: true,
     radius: '8px',
   });
@@ -828,9 +737,7 @@ test('leaving someone out changes the count', async ({ page, request }) => {
   await expect(page.locator('ol > li').first()).toContainText('1 of 1 can');
 });
 
-test('an unknown event says so, with a confused owl rather than an error', async ({
-  page,
-}) => {
+test('an unknown event shows the missing-event message', async ({ page }) => {
   const response = await page.goto('/e/AAAAAAAAAAAA');
   expect(response?.status()).toBe(404);
   await expect(
@@ -838,29 +745,8 @@ test('an unknown event says so, with a confused owl rather than an error', async
   ).toBeVisible();
 });
 
-test('the privacy page names the operator and the log retention', async ({
-  page,
-}) => {
-  await page.goto('/privacy');
-  await expect(page.getByRole('heading', { name: 'Privacy' })).toBeVisible();
-  await expect(page.getByText('Example Organisation')).toBeVisible();
-  await expect(
-    page.getByText(/These logs are deleted after 7 days/)
-  ).toBeVisible();
-});
-
-test('the footer links the legal notice between privacy and the source, and the page names the operator', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const links = page.getByRole('contentinfo').getByRole('navigation');
-  await expect(links.getByRole('link')).toHaveText([
-    'Privacy',
-    'Imprint',
-    'Open source by Willi Thiel',
-  ]);
-  await links.getByRole('link', { name: 'Imprint' }).click();
-  await expect(page).toHaveURL(/\/imprint$/);
+test('the configured legal notice names the operator', async ({ page }) => {
+  await page.goto('/imprint');
   await expect(page.getByRole('heading', { name: 'Imprint' })).toBeVisible();
   await expect(
     page.getByRole('heading', {
@@ -892,8 +778,10 @@ test('the footer links the legal notice between privacy and the source, and the 
   ).toBeVisible();
 
   // The address with a slash is the same page; German keeps the statute names.
-  await page.goto('/imprint/');
+  await page.getByRole('link', { name: 'About' }).click();
   await page.getByLabel('Language').selectOption('de');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await page.goto('/imprint/');
   await expect(
     page.getByRole('heading', {
       name: 'Anbieterkennzeichnung nach § 5 DDG und § 18 Abs. 1 MStV',
@@ -902,168 +790,10 @@ test('the footer links the legal notice between privacy and the source, and the 
   await expect(page.getByText('Kontakt', { exact: true })).toBeVisible();
 });
 
-test('German is a click away and remembered', async ({ page }) => {
-  await page.goto('/');
-  await page.getByLabel('Language').selectOption('de');
-  await expect(
-    page.getByRole('heading', { name: 'Findet einen Tag, an dem alle können.' })
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Event planen' })
-  ).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.lang)).toBe('de');
-});
-
-test('the start page has an address per language, and choosing another follows it', async ({
-  page,
-}) => {
-  await page.goto('/fr');
-  await expect(
-    page.getByRole('heading', {
-      name: 'Trouvez une date qui convient à tout le monde.',
-    })
-  ).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.lang)).toBe('fr');
-
-  await page.getByLabel('Langue').selectOption('de');
-  await expect(page).toHaveURL(/\/de$/);
-  await expect(
-    page.getByRole('heading', { name: 'Findet einen Tag, an dem alle können.' })
-  ).toBeVisible();
-
-  // The address was a choice: the plain start page keeps it.
-  await page.goto('/');
-  await expect(
-    page.getByRole('button', { name: 'Event planen' })
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/$/);
-});
-
-test('Arabic mirrors the page and calendar, then restores LTR on language change', async ({
-  page,
-}) => {
-  await page.goto('/ar');
-  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-  await expect(
-    page.getByRole('heading', { name: 'اعثر على يوم يناسب الجميع.' })
-  ).toBeVisible();
-  const days = page.locator('[data-browser-frame] .cal-row [data-day]');
-  await expect(days.nth(1)).toBeVisible();
-  // Two days side by side: a month that starts on a Sunday has that day
-  // alone in its first row.
-  const boxes = await days.evaluateAll((cells) =>
-    cells.map((cell) => cell.getBoundingClientRect().toJSON() as DOMRect)
-  );
-  const pair = boxes.findIndex((box, i) => boxes[i + 1]?.y === box.y);
-  expect(pair).toBeGreaterThanOrEqual(0);
-  expect(boxes[pair]!.x).toBeGreaterThan(boxes[pair + 1]!.x);
-  await days.nth(pair).focus();
-  await days.nth(pair).press('ArrowLeft');
-  await expect(days.nth(pair + 1)).toBeFocused();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth)
-  ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth + 1));
-
-  await page.getByLabel('اللغة').selectOption('en');
-  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
-});
-
-test('the start page answers the common questions', async ({ page }) => {
-  await page.goto('/en');
-  await expect(page.getByRole('heading', { name: 'Questions' })).toBeVisible();
-  for (const question of [
-    'Does it cost anything?',
-    'Do I need an account?',
-    'How is it different from Doodle?',
-    'Can we look for a whole weekend?',
-    'How do I invite the group?',
-    'What happens to our data?',
-  ])
-    await expect(page.getByRole('heading', { name: question })).toBeVisible();
-  // One card per feature the start page lists.
-  for (const title of ['See what works', 'No accounts'])
-    await expect(
-      page.getByRole('heading', { name: title, exact: true })
-    ).toBeVisible();
-  // The text the server wrote for readers without scripts is gone: one page,
-  // one main heading.
-  await expect(page.locator('[data-static]')).toHaveCount(0);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-});
-
-test('without scripts the start page still says what the app is and answers the questions', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  const page = await context.newPage();
-  await page.goto('/de');
-  await expect(
-    page.getByRole('heading', {
-      level: 1,
-      name: 'Findet einen Tag, an dem alle können.',
-    })
-  ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Brauche ich ein Konto?' })
-  ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Was passiert mit unseren Daten?' })
-  ).toBeVisible();
-  for (const title of ['Seht, wann es passt', 'Keine Konten'])
-    await expect(
-      page.getByRole('heading', { name: title, exact: true })
-    ).toBeVisible();
-  await context.close();
-});
-
-test('who has answered is invited to plan their own; the organiser is not', async ({
-  browser,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request, {
-    roster: ['Anna', 'Ben'],
-  });
-  const invite = (page: Page) => page.getByText('Planning something yourself?');
-
-  const anna = await browser.newPage();
-  await anna.goto(`/e/${id}`);
-  await showView(anna, 'mine');
-  await anna.getByRole('button', { name: 'Anna' }).click();
-  await expect(greeting(anna, 'Anna')).toBeVisible();
-  await expect(invite(anna)).toBeHidden();
-  await day(myCalendar(anna), D(5)).click();
-  await saved(anna);
-  await expect(invite(anna)).toBeVisible();
-  // The footer offers the same on every page but the start page.
-  await expect(
-    anna.locator('footer').getByRole('link', { name: 'Plan an event' })
-  ).toBeVisible();
-  await anna
-    .getByRole('main')
-    .getByRole('link', { name: 'Plan an event' })
-    .click();
-  await expect(anna).toHaveURL(/\/$/);
-  await expect(
-    anna.locator('footer').getByRole('link', { name: 'Plan an event' })
-  ).toHaveCount(0);
-
-  const organiser = await browser.newPage();
-  await organiser.goto(`/e/${id}#admin=${adminToken}`);
-  await showView(organiser, 'mine');
-  await organiser.getByRole('button', { name: 'Ben' }).click();
-  await day(myCalendar(organiser), D(6)).click();
-  await saved(organiser);
-  await expect(invite(organiser)).toBeHidden();
-  await anna.close();
-  await organiser.close();
-});
-
 const REMEMBERED_LANGUAGES = [
   {
     code: 'es',
     name: 'Spanish',
-    tagline: 'Encontrad un día que os venga bien a todos.',
     plan: 'Planear un evento',
     titleLabel: 'Título',
     title: 'Partido en el parque',
@@ -1074,7 +804,6 @@ const REMEMBERED_LANGUAGES = [
   {
     code: 'fr',
     name: 'French',
-    tagline: 'Trouvez une date qui convient à tout le monde.',
     plan: 'Organiser un événement',
     titleLabel: 'Titre',
     title: 'Foot au parc',
@@ -1085,7 +814,6 @@ const REMEMBERED_LANGUAGES = [
   {
     code: 'pt',
     name: 'Portuguese',
-    tagline: 'Encontrem um dia em que todos possam.',
     plan: 'Planear um evento',
     titleLabel: 'Título',
     title: 'Jogo no parque',
@@ -1096,7 +824,6 @@ const REMEMBERED_LANGUAGES = [
   {
     code: 'it',
     name: 'Italian',
-    tagline: 'Trova un giorno che vada bene a tutti.',
     plan: 'Organizza un evento',
     titleLabel: 'Titolo',
     title: 'Partita al parco',
@@ -1107,7 +834,6 @@ const REMEMBERED_LANGUAGES = [
   {
     code: 'ja',
     name: 'Japanese',
-    tagline: 'みんなが集まれる日を見つけよう。',
     plan: '予定を立てる',
     titleLabel: 'タイトル',
     title: '公園でサッカー',
@@ -1119,7 +845,6 @@ const REMEMBERED_LANGUAGES = [
   {
     code: 'nl',
     name: 'Dutch',
-    tagline: 'Vind een dag waarop iedereen kan.',
     plan: 'Plan een evenement',
     titleLabel: 'Titel',
     title: 'Voetbal in het park',
@@ -1134,11 +859,9 @@ for (const language of REMEMBERED_LANGUAGES) {
     page,
     request,
   }) => {
-    await page.goto('/');
+    await page.goto('/about');
     await page.getByLabel('Language').selectOption(language.code);
-    await expect(
-      page.getByRole('heading', { name: language.tagline })
-    ).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', language.code);
     await page.reload();
     expect(await page.evaluate(() => document.documentElement.lang)).toBe(
       language.code
@@ -1160,6 +883,7 @@ for (const language of REMEMBERED_LANGUAGES) {
         )
       ).toBe(true);
     }
+    await unlockAdmin(page);
     await page.getByRole('button', { name: language.plan }).click();
     await page.getByLabel(language.titleLabel).fill(language.title);
     await page.getByRole('button', { name: language.next }).click();
@@ -1513,14 +1237,14 @@ test('saving days or a duration that takes answers or the date away asks first',
 
 const HOME_TITLE = 'Owl Be There — Find a day everyone can make.';
 
-test('a keyboard user who follows a footer link lands in the page, which names the tab', async ({
+test('a keyboard user who follows a header link lands in the page, which names the tab', async ({
   page,
   request,
 }, testInfo) => {
   test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
   const { id } = await createEvent(request, { title: 'Chess club' });
   const main = page.locator('main');
-  const footer = page.getByRole('contentinfo').getByRole('navigation');
+  const navigation = page.getByRole('banner').getByRole('navigation');
   const scrollY = () => page.evaluate(() => window.scrollY);
 
   // A fresh load leaves focus where the browser puts it.
@@ -1530,38 +1254,36 @@ test('a keyboard user who follows a footer link lands in the page, which names t
     await page.evaluate(() => document.activeElement === document.body)
   ).toBe(true);
 
-  const privacy = footer.getByRole('link', { name: 'Privacy' });
-  await privacy.focus();
-  await expect.poll(scrollY).toBeGreaterThan(0);
+  const about = navigation.getByRole('link', { name: 'About' });
+  await about.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page).toHaveURL(/\/about$/);
   await expect(main).toBeFocused();
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
+  await expect(page).toHaveTitle('About · Owl Be There');
   await expect.poll(scrollY).toBe(0);
 
   // Back and Forward are page changes too.
-  await privacy.focus();
+  await about.focus();
   await page.goBack();
   await expect(page).toHaveTitle(HOME_TITLE);
   await expect(main).toBeFocused();
-  await privacy.focus();
+  await about.focus();
   await page.goForward();
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
+  await expect(page).toHaveTitle('About · Owl Be There');
   await expect(main).toBeFocused();
 
-  const imprint = footer.getByRole('link', { name: 'Imprint' });
-  await imprint.focus();
+  await navigation.getByRole('link', { name: 'Admin' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveTitle('Imprint · Owl Be There');
+  await expect(page).toHaveTitle('Admin · Owl Be There');
   await expect(main).toBeFocused();
 
   // An event keeps its own title, and the way back to it gives it again.
   await page.goto(`/e/${id}`);
   await expect(page).toHaveTitle('Chess club · Owl Be There');
-  await privacy.focus();
+  await about.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
-  await privacy.focus();
+  await expect(page).toHaveTitle('About · Owl Be There');
+  await about.focus();
   await page.goBack();
   await expect(page).toHaveTitle('Chess club · Owl Be There');
   await expect(main).toBeFocused();
@@ -1579,39 +1301,11 @@ test('an event that cannot be shown does not keep the title of the page before i
 }) => {
   await page.goto('/e/AAAAAAAAAAAA');
   await expect(page).toHaveTitle(HOME_TITLE);
-  await page
-    .getByRole('contentinfo')
-    .getByRole('link', { name: 'Privacy' })
-    .click();
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
+  await page.getByRole('banner').getByRole('link', { name: 'About' }).click();
+  await expect(page).toHaveTitle('About · Owl Be There');
   await page.goBack();
   await expect(page).toHaveURL(/\/e\/AAAAAAAAAAAA$/);
   await expect(page).toHaveTitle(HOME_TITLE);
-});
-
-test('choosing another language on the same page keeps focus and renames the tab', async ({
-  page,
-}, testInfo) => {
-  test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
-  await page.goto('/privacy');
-  const language = page.getByLabel('Language');
-  await language.focus();
-  await language.selectOption('de');
-  await expect(page).toHaveTitle('Datenschutz · Owl Be There');
-  // The same select, now labelled in German.
-  await expect(page.getByLabel('Sprache')).toBeFocused();
-
-  await page.goto('/nowhere');
-  await page.getByLabel('Sprache').selectOption('en');
-  await expect(page).toHaveTitle('We can’t find this page. · Owl Be There');
-
-  // The start page moves between addresses without taking focus.
-  await page.goto('/de');
-  const select = page.getByLabel('Sprache');
-  await select.focus();
-  await select.selectOption('fr');
-  await expect(page).toHaveURL(/\/fr$/);
-  await expect(page.getByLabel('Langue')).toBeFocused();
 });
 
 test('a dialog that opens on arrival keeps focus, and closing it without an opener lands in the page', async ({
@@ -1620,8 +1314,7 @@ test('a dialog that opens on arrival keeps focus, and closing it without an open
   test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Plan an event' }).click();
+  await startWizard(page);
   await page.getByLabel('Title').fill('Pub quiz');
   await page.getByRole('button', { name: 'Next' }).click();
   // The accessible name is "Sat: Saturday": the visible text first.

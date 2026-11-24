@@ -6,7 +6,36 @@ import { HOME } from '@owl/shared/home/en';
  * missing in `de.ts` is a build error. Placeholders are `{name}`; counted
  * texts come in `_one` / `_other` pairs, chosen by `Intl.PluralRules`.
  */
+const forkTexts = {
+  'about.title': 'About',
+  'about.intro':
+    'Find a day everyone can make. Open an event link and mark the days you’re free. No accounts.',
+  'about.privacy': 'Data privacy',
+  'about.storage':
+    'Event details, names, notes and availability are stored on Pedro’s home server in Providence, Rhode Island, a repurposed A95X F2 TV box running Debian.',
+  'about.sharing':
+    'Anyone with the event link can see the poll and its responses. This browser remembers your events and access keys.',
+  'about.retention': 'Events are kept until someone manually deletes them.',
+  'about.source': 'Source code',
+  'siteAdmin.title': 'Admin',
+  'admin.pin': 'Admin PIN',
+  'admin.unlock': 'Unlock',
+  'admin.lock': 'Lock',
+  'admin.checking': 'Checking PIN…',
+  'admin.incorrect': 'Incorrect PIN.',
+  'admin.expired':
+    'Your admin session expired. Enter the PIN again to continue.',
+  'theme.gradients': 'Gradients',
+  'theme.shapes': 'Wallpaper shapes',
+  'theme.refreshGradients': 'Refresh gradients',
+  'theme.refreshShapes': 'Refresh shapes',
+  'theme.gradientOption': 'Gradient {number}',
+  'theme.shapeOption': 'Shape {number}',
+  'theme.preview': 'Wallpaper preview',
+} as const;
+
 export const en = {
+  ...forkTexts,
   'app.tagline': TAGLINES.en,
 
   ...HOME,
@@ -369,7 +398,9 @@ export const en = {
 } as const;
 
 export type TranslationKey = keyof typeof en;
-export type Dictionary = Record<TranslationKey, string>;
+type ForkKey = keyof typeof forkTexts;
+export type Dictionary = Record<Exclude<TranslationKey, ForkKey>, string> &
+  Partial<Record<ForkKey, string>>;
 
 /** Keys that come in `_one` / `_other` pairs, without the suffix. */
 export type CountedKey = {

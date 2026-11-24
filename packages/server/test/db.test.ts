@@ -29,7 +29,6 @@ import {
   purgeEmpty,
   snapshot,
   replaceMarks,
-  sweepExpired,
   updateEvent,
 } from '../src/db/repo.js';
 import { NAME_KEY_VERSION, rekeyParticipants } from '../src/db/rekey.js';
@@ -111,7 +110,7 @@ describe('migrate', () => {
     );
     db.run("INSERT INTO marks VALUES ('p', 'old', '2027-03-06', 'yes')");
 
-    expect(migrate(db)).toBe(2);
+    expect(migrate(db)).toBe(MIGRATIONS.length - 1);
     expect(db.get<{ language: string }>('SELECT language FROM events')).toEqual(
       {
         language: 'de',
@@ -166,7 +165,7 @@ describe('migrate', () => {
     expect(db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')).toEqual({
       foreign_keys: 1,
     });
-    expect(migrate(db)).toBe(2);
+    expect(migrate(db)).toBe(MIGRATIONS.length - 1);
   });
 
   it('upgrades a v2 database to new languages without changing existing rows', () => {
@@ -184,7 +183,7 @@ describe('migrate', () => {
     );
     db.run("INSERT INTO marks VALUES ('p', 'old', '2027-03-06', 'yes')");
 
-    expect(migrate(db)).toBe(1);
+    expect(migrate(db)).toBe(MIGRATIONS.length - 2);
     expect(
       db.get<{ language: string }>(
         'SELECT language FROM events WHERE id = ?',
@@ -711,42 +710,6 @@ describe('deleting many events', () => {
     );
   const count = (db: Db): number =>
     db.get<{ n: number }>('SELECT count(*) AS n FROM events')!.n;
-
-  it.each([0, 1, 199, 200, 201, 400, 401, 1000])(
-    'sweeps %i expired events, and only those',
-    (n) => {
-      const db = fresh();
-      insert(db, ids(n));
-      insert(db, ['kept'], '2027-03-02');
-      const swept = sweepExpired(db, '2027-03-02');
-      expect(swept.sort()).toEqual(ids(n));
-      expect(count(db)).toBe(1);
-      expect(sweepExpired(db, '2027-03-02')).toEqual([]);
-    }
-  );
-
-  it('sweeps nothing on the last day itself', () => {
-    const db = fresh();
-    insert(db, ids(3));
-    expect(sweepExpired(db, '2027-03-01')).toEqual([]);
-    expect(count(db)).toBe(3);
-  });
-
-  it('takes their days, people and marks along', () => {
-    const db = fresh();
-    insert(db, ids(250));
-    db.run(
-      "INSERT INTO event_days (event_id, day, added_at) VALUES ('e00249', '2027-02-27', 0)"
-    );
-    db.run(
-      `INSERT INTO participants (id, event_id, name, name_key, source, created_at)
-       VALUES ('p', 'e00249', 'Anna', 'anna', 'self', 0)`
-    );
-    sweepExpired(db, '2027-03-02');
-    for (const table of ['event_days', 'participants', 'marks']) {
-      expect(db.get(`SELECT 1 FROM ${table}`)).toBeUndefined();
-    }
-  });
 
   it.each([0, 1, 199, 200, 201, 650])(
     'purges %i events nobody answered',

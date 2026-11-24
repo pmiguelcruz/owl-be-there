@@ -7,9 +7,6 @@ import { MigrationError, migrate } from './db/migrations.js';
 import { rekeyParticipants } from './db/rekey.js';
 import { Db } from './db/sqlite.js';
 
-/** How often expired events are swept out. Their last day is a whole day. */
-const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
-
 /** How long a shutdown may take before the process gives up waiting. */
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -63,17 +60,6 @@ async function main(): Promise<void> {
     );
   }
 
-  const sweep = (): void => {
-    try {
-      app.sweep();
-    } catch (error) {
-      app.log.error({ err: error }, 'sweeping expired events failed');
-    }
-  };
-  sweep();
-  const sweeper = setInterval(sweep, SWEEP_INTERVAL_MS);
-  sweeper.unref();
-
   // The process is PID 1 in the container, so it handles the signals itself:
   // close the server, then the database, so the WAL is folded back cleanly.
   let stopping = false;
@@ -81,7 +67,6 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     app.log.info({ signal }, 'shutting down');
-    clearInterval(sweeper);
     // A connection that will not close must not keep the container from
     // stopping; the orchestrator would kill it less gracefully anyway.
     setTimeout(() => {

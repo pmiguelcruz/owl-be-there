@@ -84,12 +84,7 @@ describe('a command that cannot work', () => {
   });
 
   it('does not create a database that is not there', () => {
-    for (const args of [
-      ['stats'],
-      ['sweep'],
-      ['list'],
-      ['delete', 'AAAAAAAAAAAA'],
-    ]) {
+    for (const args of [['stats'], ['list'], ['delete', 'AAAAAAAAAAAA']]) {
       const { code, err } = cli(args);
       expect(code, args.join(' ')).toBe(1);
       expect(err.join()).toMatch(/no database at .*owl\.db/);
@@ -211,15 +206,6 @@ describe('a command that works', () => {
       'Deleted 1 event(s) nobody answered.',
     ]);
     expect(cli(['list']).out).toEqual([]);
-  });
-
-  it('sweeps the events whose last day has passed', () => {
-    const db = database();
-    event(db, 'AAAAAAAAAAAA');
-    db.run("UPDATE events SET expires_on = '2000-01-01'");
-    db.close();
-    expect(cli(['sweep']).out).toEqual(['Deleted 1 expired event(s).']);
-    expect(cli(['sweep']).out).toEqual(['Deleted 0 expired event(s).']);
   });
 });
 

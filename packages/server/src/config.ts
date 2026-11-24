@@ -25,6 +25,8 @@ export interface Config {
   trustProxy: string[] | false;
   /** Off is the emergency switch: existing events keep working. */
   creationEnabled: boolean;
+  /** Server-only four-digit PIN. Creation is unavailable when unset. */
+  adminPin: string | null;
   /** A ceiling on the number of stored events. */
   maxEvents: number;
   /**
@@ -142,6 +144,11 @@ export function loadConfig(env: Env = process.env): Config {
     problems.push('OWL_SECRET must be at least 32 characters long');
   }
 
+  const adminPin = read(env, 'ADMIN_PIN');
+  if (adminPin !== null && !/^\d{4}$/.test(adminPin)) {
+    problems.push('ADMIN_PIN must be exactly four digits');
+  }
+
   const imprintUrl = read(env, 'IMPRINT_URL');
   if (imprintUrl !== null && !/^https?:\/\/\S+$/i.test(imprintUrl)) {
     problems.push('IMPRINT_URL must be an http(s) URL');
@@ -165,6 +172,7 @@ export function loadConfig(env: Env = process.env): Config {
     clientDir,
     trustProxy,
     creationEnabled: boolean('CREATION_ENABLED', true),
+    adminPin,
     maxEvents: integer('MAX_EVENTS', 10_000, 1, 10_000_000),
     maxDbBytes: optionalInteger('MAX_DB_BYTES', 1, 2 ** 50),
     rateLimitMultiplier: integer('RATE_LIMIT_MULTIPLIER', 1, 1, 100_000),

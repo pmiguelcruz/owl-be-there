@@ -4,8 +4,6 @@ import {
   EMOJIS,
   emojiIcon,
   escapeMarkup,
-  FAQ_TOPICS,
-  FEATURES,
   isRtl,
   LANGUAGES,
   LOCALES,
@@ -16,7 +14,6 @@ import {
   type EventSnapshotData,
   type Language,
 } from '@owl/shared';
-import { HOME_TEXTS } from '@owl/shared/home-texts';
 import { z } from 'zod';
 
 /**
@@ -247,11 +244,8 @@ export function jsonLd(data: unknown): string {
 }
 
 /**
- * The start page in one language, or `/` in English: the default head, the
- * structured data search engines read, and the page's text as plain markup.
- * The markup carries the texts the app shows, from the same dictionary, and
- * the stylesheet hides it from browsers that run the app, so nothing jumps
- * while the app starts.
+ * The start page’s metadata. Saved events live in this browser, so the
+ * server has no event list to render.
  */
 export function homePage(
   publicUrl: string,
@@ -259,8 +253,6 @@ export function homePage(
 ): { head: string; content: string; language: Language } {
   const lang = language ?? 'en';
   const path = homePath(language);
-  const texts = HOME_TEXTS[lang];
-  const e = escapeMarkup;
   const data = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -276,45 +268,19 @@ export function homePage(
         isAccessibleForFree: true,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
       },
-      {
-        '@type': 'FAQPage',
-        inLanguage: lang,
-        mainEntity: FAQ_TOPICS.map((topic) => ({
-          '@type': 'Question',
-          name: texts[`home.faq.${topic}.q`],
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: texts[`home.faq.${topic}.a`],
-          },
-        })),
-      },
     ],
   };
   const head = [
     defaultHead(publicUrl, path, { language: lang, alternates: true }),
     jsonLd(data),
   ].join('\n    ');
-  const content = [
-    '<div data-static>',
-    `<h1>${e(SERVER_TEXTS[lang].tagline)}</h1>`,
-    `<p>${e(texts['home.lead'])}</p>`,
-    ...FEATURES.flatMap((feature) => [
-      `<h2>${e(texts[`home.feature.${feature}.title`])}</h2>`,
-      `<p>${e(texts[`home.feature.${feature}.text`])}</p>`,
-    ]),
-    `<h2>${e(texts['home.faq.title'])}</h2>`,
-    ...FAQ_TOPICS.flatMap((topic) => [
-      `<h3>${e(texts[`home.faq.${topic}.q`])}</h3>`,
-      `<p>${e(texts[`home.faq.${topic}.a`])}</p>`,
-    ]),
-    '</div>',
-  ].join('');
+  const content = '';
   return { head, content, language: lang };
 }
 
 /**
  * The sitemap: the start page in every language, each naming the others, and
- * the privacy page, and the legal notice when the instance has one. Event
+ * the about page, and the legal notice when the instance has one. Event
  * pages are private and never listed.
  */
 export function sitemap(
@@ -337,7 +303,7 @@ export function sitemap(
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ...home,
-    `  <url>\n    <loc>${e(publicUrl)}/privacy</loc>\n  </url>`,
+    `  <url>\n    <loc>${e(publicUrl)}/about</loc>\n  </url>`,
     ...(options.imprint
       ? [`  <url>\n    <loc>${e(publicUrl)}/imprint</loc>\n  </url>`]
       : []),
@@ -367,20 +333,21 @@ export function robotsTxt(publicUrl: string): string {
 export function eventHead(publicUrl: string, data: EventSnapshotData): string {
   const { event } = data;
   const texts = SERVER_TEXTS[event.language];
-  const emoji = EMOJIS[event.emoji];
+  const emoji =
+    event.theme || event.emoji === 'owl' ? null : EMOJIS[event.emoji];
   const description = previewStatus(texts, data, LOCALES[event.language]);
   return head({
     publicUrl,
     path: `/e/${event.id}`,
     // The tab shows the emoji as its icon; in the title it would appear twice.
     title: `${event.title} · ${APP_NAME}`,
-    ogTitle: `${emoji} ${event.title}`,
+    ogTitle: emoji ? `${emoji} ${event.title}` : event.title,
     description,
     // The version in the address: a changed poll is a new picture to caches
     // that keep one per URL.
     image: `${publicUrl}/e/${event.id}/og.png?v=${event.version}`,
     imageAlt: texts.previewCalendarAlt,
     noindex: true,
-    icon: emojiIcon(emoji),
+    icon: emoji ? emojiIcon(emoji) : '/favicon.svg',
   });
 }

@@ -10,7 +10,7 @@ import {
   myCalendar,
   saved,
   showView,
-  utcDateOf,
+  startWizard,
 } from '../helpers.ts';
 
 /** Fail on anything axe calls serious or critical against WCAG 2.2 AA. */
@@ -58,6 +58,10 @@ for (const scheme of ['light', 'dark'] as const) {
     const { id, adminToken } = await createEvent(request, {
       minCount: 2,
       description: 'Bring a ball.',
+      theme: {
+        gradient: { start: '#f4696b', end: '#7279d3', angle: 40 },
+        shape: 71922,
+      },
     });
     await answer(
       request,
@@ -69,25 +73,9 @@ for (const scheme of ['light', 'dark'] as const) {
 
     await page.goto('/');
     await expectAccessible(page, 'home');
-    // The example's day sheet, with its notes block.
-    const frame = page.locator('[data-browser-frame]');
-    const groupTab = frame.getByRole('tab', { name: /^Group/ });
-    if (await groupTab.isVisible()) await groupTab.click();
-    const example = frame.getByRole('grid', { name: 'Group' });
-    const days = await example
-      .locator('[data-day]')
-      .evaluateAll((cells) => cells.map((c) => c.getAttribute('data-day')!));
-    const thursday = days.find(
-      (iso) => utcDateOf(iso).getUTCDay() === 4 && Number(iso.slice(8)) >= 15
-    )!;
-    await day(example, thursday).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expectAccessible(page, 'example day sheet');
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Close', exact: true })
-      .click();
-    await page.getByRole('button', { name: 'Plan an event' }).click();
+    await page.goto('/admin');
+    await expectAccessible(page, 'PIN entry');
+    await startWizard(page);
     await expectAccessible(page, 'wizard');
 
     await page.goto(`/e/${id}#admin=${adminToken}`);
@@ -132,8 +120,8 @@ for (const scheme of ['light', 'dark'] as const) {
     await expectAccessible(page, 'person sheet');
     await page.keyboard.press('Escape');
 
-    await page.goto('/privacy');
-    await expectAccessible(page, 'privacy');
+    await page.goto('/about');
+    await expectAccessible(page, 'about');
     await page.goto('/imprint');
     await expectAccessible(page, 'imprint');
     await context.close();
@@ -227,7 +215,7 @@ test('an event page tells link previews its title, and the API is off limits to 
   expect((await picture.body()).length).toBeLessThan(300_000);
 });
 
-test('the 404 link and the "plan your own" link look and behave like buttons: keyboard focus, a ring, a big target, axe', async ({
+test('the 404 link and the Admin link look and behave like buttons: keyboard focus, a ring, a big target, axe', async ({
   page,
   request,
 }) => {
@@ -267,13 +255,14 @@ test('the 404 link and the "plan your own" link look and behave like buttons: ke
   await page.getByRole('button', { name: 'Anna' }).click();
   await day(myCalendar(page), dayFromNow(5)).click();
   await saved(page);
-  const invite = page
-    .getByRole('main')
-    .getByRole('link', { name: 'Plan an event' });
+  await expect(page.getByRole('main').getByText('Plan an event')).toHaveCount(
+    0
+  );
+  const invite = page.getByRole('banner').getByRole('link', { name: 'Admin' });
   await expect(invite).toBeVisible();
   expect(await focusedByKeyboard(invite)).toEqual(ring);
   expect((await invite.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  await expectAccessible(page, 'event page with the invitation');
+  await expectAccessible(page, 'event page with admin navigation');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/admin$/);
 });

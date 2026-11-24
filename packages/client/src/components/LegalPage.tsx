@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Owl } from './Owl.tsx';
 import { Card, Notice } from './ui.tsx';
 
 /**
@@ -20,7 +19,6 @@ export function LegalPage({
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Owl mood="thinking" size={88} />
         <h1 className="min-w-0 flex-1 text-2xl font-black break-words sm:text-3xl">
           {title}
         </h1>

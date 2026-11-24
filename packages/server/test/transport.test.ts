@@ -6,6 +6,8 @@ import { migrate } from '../src/db/migrations.js';
 import { Db } from '../src/db/sqlite.js';
 import {
   createEvent,
+  creationHeaders,
+  TEST_ADMIN_PIN,
   sessionRequest,
   testApp,
   type TestApp,
@@ -75,6 +77,7 @@ async function listening(options: {
   logs?: string[];
 }) {
   const config = loadConfig({
+    ADMIN_PIN: TEST_ADMIN_PIN,
     PUBLIC_URL: 'https://owl.example.org',
     LOG_LEVEL: options.logLevel ?? 'silent',
     RATE_LIMIT_MULTIPLIER: '1000',
@@ -159,9 +162,14 @@ describe('a request that stops arriving', () => {
     const { app, port } = await listening({ requestTimeoutMs: 2000 });
     try {
       const body = '{"nope":true}';
+      const headers = await creationHeaders(app);
+      const tokenHeader = Object.entries(headers)
+        .map(([name, value]) => `${name}: ${value}\r\n`)
+        .join('');
       const { reply, closedAfterMs } = await exchange(port, async (write) => {
         write(
-          POST_HEAD(body.length, 'Connection: close\r\n') + body.slice(0, 4)
+          POST_HEAD(body.length, tokenHeader + 'Connection: close\r\n') +
+            body.slice(0, 4)
         );
         await pause(400);
         write(body.slice(4));
@@ -252,7 +260,7 @@ describe('logging a request the parser refuses', () => {
     const { app } = await listening({ logLevel: 'info', logs });
     try {
       const error = Object.assign(new Error('disk gone'), { code: 'EIO' });
-      app.log.error({ err: error }, 'sweeping expired events failed');
+      app.log.error({ err: error }, 'test operation failed');
       const line = JSON.parse(logs.at(-1)!);
       expect(line.err).toMatchObject({
         type: 'Error',

@@ -13,7 +13,7 @@ import { readLanguage, writeLanguage } from '../lib/prefs.ts';
 import { ReloadGuard } from '../lib/reloadGuard.ts';
 import { browserBacking } from '../lib/storage.ts';
 import { dictionaries } from './dictionaries.ts';
-import type { CountedKey, Pack, TranslationKey } from './en.ts';
+import { en, type CountedKey, type Pack, type TranslationKey } from './en.ts';
 
 export type Params = Record<string, string | number>;
 
@@ -41,7 +41,7 @@ function translatorFor(language: Language, pack: Pack, locale: string) {
       ])
     );
   const t = (key: TranslationKey, params?: Params): string =>
-    interpolate(pack.texts[key], localized(params));
+    interpolate(pack.texts[key] ?? en[key], localized(params));
   /**
    * A counted text: `{count}` is filled in and the plural form chosen — one
    * the language adds (Czech "few", Arabic "two") if it has it, else `_one`
@@ -51,9 +51,7 @@ function translatorFor(language: Language, pack: Pack, locale: string) {
     const category = plural.select(count);
     const text =
       pack.forms?.[category]?.[key] ??
-      pack.texts[
-        `${key}_${category === 'one' ? 'one' : 'other'}` as TranslationKey
-      ];
+      pack.texts[`${key}_${category === 'one' ? 'one' : 'other'}` as const];
     return interpolate(text, localized({ ...params, count }));
   };
   return { t, tn, number };

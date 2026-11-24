@@ -397,22 +397,24 @@ function DetailsForm({
           />
         )}
       </Field>
-      <Field label={t('create.emoji')}>
-        {({ id }) => (
-          <Select
-            id={id}
-            value={input.emoji}
-            onChange={(e) => edit({ emoji: e.target.value as EmojiKey })}
-            className="min-h-11 rounded-2xl border-2 border-line bg-surface ps-3"
-          >
-            {EMOJI_KEYS.map((key) => (
-              <option key={key} value={key}>
-                {EMOJIS[key]} {t(`emoji.${key}`)}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
+      {!event.theme && (
+        <Field label={t('create.emoji')}>
+          {({ id }) => (
+            <Select
+              id={id}
+              value={input.emoji}
+              onChange={(e) => edit({ emoji: e.target.value as EmojiKey })}
+              className="min-h-11 rounded-2xl border-2 border-line bg-surface ps-3"
+            >
+              {EMOJI_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {EMOJIS[key]} {t(`emoji.${key}`)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      )}
       <Field label={t('create.description')} hint={t('create.descriptionHint')}>
         {({ id, describedBy }) => (
           <TextArea

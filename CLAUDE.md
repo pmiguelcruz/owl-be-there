@@ -19,13 +19,13 @@ All commands need Node 26 (`.nvmrc`). Install with `npm ci`, never `npm install`
 | `npm run test:e2e`      | Playwright: Chromium and WebKit, desktop and mobile with touch                                                                                                           |
 | `npm run ci:local`      | lint, typecheck, audit, secret scan, tests, the bundle check and e2e; CI also builds and scans the image, runs CodeQL and dependency review, and renders the screenshots |
 | `npm run build`         | shared → server → client                                                                                                                                                 |
-| `npm run screenshot`    | after a build: the README's pictures of the start page example (`docs/`) and `og.png`                                                                                    |
+| `npm run screenshot`    | after a build: sample event pictures (`docs/`) and `og.png`                                                                                                              |
 | `npm run check:bundle`  | after a build: the entry under its budget, with the English and German texts and no other language's                                                                     |
 
 ## Layout
 
-- `packages/shared` — pure domain logic and zod schemas, used by both sides: dates, candidate days, the week grid, rectangle selection, toggles, ranking of days and blocks, retention, `.ics`, QR codes, limits.
-- `packages/server` — Fastify. `db/sqlite.ts` is the only module that imports `node:sqlite`; `db/repo.ts` holds every query. Also: tokens and passwords, rate limits, security headers, the SSE hub, link-preview injection for `/e/:id` and its picture `/e/:id/og.png` (`preview.ts`: the SVG comes from `shared/preview.ts`, resvg turns it into a PNG), the start page per language (`/de` …) with `hreflang`, JSON-LD and its text written into `#root` for readers without scripts (texts in `shared/home/<code>.ts`, assembled for the server in `shared/home-texts.ts`; the client takes one language at a time), `robots.txt` and `sitemap.xml`, the retention sweep and the operator CLI (`commands.ts` holds the logic, `cli.ts` is the entry).
+- `packages/shared` — pure domain logic and zod schemas, used by both sides: dates, candidate days, the week grid, rectangle selection, toggles, ranking of days and blocks, `.ics`, QR codes, limits.
+- `packages/server` — Fastify. `db/sqlite.ts` is the only module that imports `node:sqlite`; `db/repo.ts` holds every query. Also: tokens and passwords, rate limits, security headers, the SSE hub, link-preview injection for `/e/:id` and its picture `/e/:id/og.png` (`preview.ts`: the SVG comes from `shared/preview.ts`, resvg turns it into a PNG), the start page per language (`/de` …) with `hreflang` and JSON-LD, `robots.txt` and `sitemap.xml`, PIN-protected event creation and the operator CLI (`commands.ts` holds the logic, `cli.ts` is the entry).
 - `packages/client` — React 19 + Vite + Tailwind 4. No router library and no state library: `lib/route.ts`, `useSyncExternalStore` stores, a `SaveQueue` for auto-save. English and German ship in the entry; `i18n/dictionaries.ts` loads every other language as a chunk of its own. `lib/` is unit-tested in Node; components are tested end to end.
 - `e2e/` — Playwright specs and the harness that starts a real server.
 
@@ -36,7 +36,7 @@ All commands need Node 26 (`.nvmrc`). Install with `npm ci`, never `npm install`
 - **No IP address is stored or logged by the application.** Rate limits live in memory. Request logging is off.
 - **Secrets travel in the URL fragment** (`#admin=…`), never in a path or query, and the client strips the fragment after reading it.
 - **`PUBLIC_URL` is the only source of absolute URLs.** The domain will change; nothing may hard-code it.
-- **Reads never write.** Only a change extends an event's life; the retention date is computed by `shared/retention.ts` in one place.
+- **Reads never write.** Events stay until an organiser or operator explicitly deletes them.
 - **zod at every boundary**: request bodies, API responses in the client, values read from local storage.
 - **No requests to third parties** from the client: fonts are bundled, there is no analytics.
 
@@ -79,7 +79,7 @@ Touch drags are simulated two ways, because the browsers differ: CDP `Input.disp
 - **The SSE route hijacks the response**, so the `onSend` header hook does not run for it; it sets `ctx.headers` itself. Hang up on a stream through the hub (`hangUp`), which forgets it before ending it — a write to an ended response is an uncaught error. The hub closes in `preClose`: the server waits for open connections before `onClose`, and a live stream never ends on its own.
 - **`events.version` moves on every write, marks included.** It is no concurrency token for the organiser's edits; the day list carries `baseDays` instead.
 - **Anything async in a route happens before `db.tx`** (scrypt hashing above all), so what was checked before the `await` is checked again inside the transaction — the participant's `token_gen` and password hash included.
-- **`index.html` has two markers the server needs:** the `owl:head` block and `<!--owl:root-->` inside `#root`; `PageTemplate` refuses a file without either. The start page's server-written text is hidden by the `js` class the inline script sets, so it never flashes before the app replaces it; a text on the start page belongs in `shared/home/<code>.ts`, or the two drift apart. The server adds the `#owl-i18n` data block after the head block of every page; a data block is never run, so it needs no hash.
+- **`index.html` has two markers the server needs:** the `owl:head` block and `<!--owl:root-->` inside `#root`; `PageTemplate` refuses a file without either. The home page renders the browser’s saved events after hydration. The server adds the `#owl-i18n` data block after the head block of every page; a data block is never run, so it needs no hash.
 - **`snapshot()` returns a cached object** shared by every caller of that event version. Never mutate it, and never cache inside a transaction (a rollback would reuse the version number for other data).
 - **resvg-wasm objects must be freed.** `Resvg` and the rendered image live in WebAssembly memory that V8 does not see; without `free()` every new picture leaks about 3 MB.
 - **Node ignores `requestTimeout` while `headersTimeout` is longer**, so both are set together.
@@ -95,7 +95,7 @@ Touch drags are simulated two ways, because the browsers differ: CDP `Input.disp
 - **The language select shows `choice`, not `language`**: a controlled select would jump back while the chosen language loads.
 - **A dictionary that fails to load reloads the page once** (`lib/reloadGuard.ts`, flag `owl.i18n-reload` in sessionStorage), as an old hashed chunk is gone after a deploy: never offline (marks waiting to be saved would go with the page), never without a flag that survives the reload, never twice for one language. The flag goes once that language loads.
 - **The inline script of `index.html` repeats `detectLanguage`** to preload the starting language's chunk from `#owl-i18n`; `indexHtml.test.ts` runs both side by side. A wrong guess costs a request, never a wrong language.
-- **`HOME_TEXTS` is never exported from the shared index**, or the client carries every language again; the server imports `@owl/shared/home-texts`.
+- **Keep language dictionaries out of the shared index**, or the client carries every language again.
 - **Wrong passwords are counted before the check**, not after it: a miss recorded only after the `await` let parallel guesses all pass the wait.
 
 ## Working agreements

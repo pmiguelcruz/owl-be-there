@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import rateLimit from '@fastify/rate-limit';
-import { todayUTC } from '@owl/shared';
 import Fastify, {
   LogController,
   type FastifyError,
@@ -15,7 +14,6 @@ import {
 } from './auth/throttle.js';
 import { ConfigError, type Config } from './config.js';
 import { systemClock, type AppContext, type Clock } from './context.js';
-import { sweepExpired } from './db/repo.js';
 import type { Db } from './db/sqlite.js';
 import { ApiError, networkKey, ValidationError } from './http.js';
 import {
@@ -54,7 +52,6 @@ export interface BuildAppOptions {
 declare module 'fastify' {
   interface FastifyInstance {
     /** Delete expired events; returns how many went. */
-    sweep(): number;
     hub: SseHub;
   }
 }
@@ -191,7 +188,7 @@ export async function buildApp(
 
   const app = Fastify({
     // Request logging is off: a request log is a list of IP addresses with
-    // the event links they opened. What is logged — start-up, errors, sweeps
+    // the event links they opened. What is logged — start-up and errors
     // — carries neither.
     logger:
       config.logLevel === 'silent'
@@ -339,15 +336,6 @@ export async function buildApp(
   await registerSite(app, ctx);
 
   app.decorate('hub', hub);
-  app.decorate('sweep', () => {
-    const ids = sweepExpired(db, todayUTC(new Date(clock.now())));
-    for (const id of ids) hub.deleted(id);
-    if (ids.length > 0) {
-      if (!db.checkpoint()) app.log.warn('checkpoint after sweep incomplete');
-      app.log.info({ deleted: ids.length }, 'expired events deleted');
-    }
-    return ids.length;
-  });
   // Before the server stops, not after: it waits for every open connection to
   // finish, and a live stream never finishes by itself — on `onClose` a
   // single open browser tab held the shutdown until the hard timeout.

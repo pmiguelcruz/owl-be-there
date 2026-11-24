@@ -24,7 +24,6 @@ export function eventSnapshot(version = 3): EventSnapshotData {
       status: 'open',
       finalStart: null,
       finalEnd: null,
-      expiresOn: '2027-05-30',
       version,
       days: ['2027-03-06'],
     },

@@ -10,6 +10,19 @@ import { en } from '../packages/client/src/i18n/en.ts';
 // Read once per worker, so D(n) is the same day for the whole run even when it
 // crosses midnight UTC between creating an event and clicking its days.
 const BASE = Date.now();
+const TEST_ADMIN_PIN = '4182';
+
+export async function unlockAdmin(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Admin', exact: true }).click();
+  await page.getByLabel('Admin PIN').fill(TEST_ADMIN_PIN);
+  await page.getByRole('button', { name: 'Unlock' }).click();
+}
+
+export async function startWizard(page: Page): Promise<void> {
+  await page.goto('/');
+  await unlockAdmin(page);
+  await page.getByRole('button', { name: 'Plan an event' }).click();
+}
 
 /** A day `offset` days from today, in UTC — far enough ahead to be valid in every zone. */
 export function dayFromNow(offset: number): string {
@@ -40,7 +53,13 @@ export async function createEvent(
   request: APIRequestContext,
   overrides: Record<string, unknown> = {}
 ): Promise<CreatedEvent> {
+  const unlocked = await request.post('/api/admin/unlock', {
+    data: { pin: TEST_ADMIN_PIN },
+  });
+  expect(unlocked.status()).toBe(200);
+  const { token } = await unlocked.json();
   const response = await request.post('/api/events', {
+    headers: { 'x-creation-token': token },
     data: {
       title: 'Summer tournament',
       emoji: 'soccer',

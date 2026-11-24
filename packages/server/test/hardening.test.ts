@@ -5,6 +5,7 @@ import { insertParticipant } from '../src/db/repo.js';
 import { HourlyCeiling } from '../src/routes/events.js';
 import {
   createEvent,
+  creationHeaders,
   getSnapshot,
   join,
   mark,
@@ -142,6 +143,7 @@ describe('how far ahead days may lie', () => {
       const inside = await t.app.inject({
         method: 'POST',
         url: '/api/events',
+        headers: await creationHeaders(t.app),
         payload: {
           title: 'Inside',
           emoji: 'owl',
@@ -155,6 +157,7 @@ describe('how far ahead days may lie', () => {
     const ok = await t.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(t.app),
       payload: {
         title: 'Far',
         emoji: 'owl',
@@ -167,6 +170,7 @@ describe('how far ahead days may lie', () => {
     const far = await t.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(t.app),
       payload: {
         title: 'Too far',
         emoji: 'owl',
@@ -183,6 +187,7 @@ describe('how far ahead days may lie', () => {
     const response = await t.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(t.app),
       payload: {
         title: 'End of time',
         emoji: 'owl',

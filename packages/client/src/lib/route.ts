@@ -1,21 +1,23 @@
 import { isId, isLanguage, type Language } from '@owl/shared';
 
 /**
- * Five pages need no router library: the path, a way to change it, and a
+ * These pages need no router library: the path, a way to change it, and a
  * subscription to the browser's back and forward buttons.
  */
 export type Route =
   /** `/de`, `/fr` …: the start page in that language, for search engines. */
   | { page: 'home'; language?: Language }
   | { page: 'event'; id: string }
-  | { page: 'privacy' }
+  | { page: 'about' }
+  | { page: 'admin' }
   | { page: 'imprint' }
   | { page: 'not-found' };
 
 export function parseRoute(pathname: string): Route {
   if (pathname === '/' || pathname === '') return { page: 'home' };
   // The server answers these with and without a trailing slash; so does the app.
-  if (/^\/privacy\/?$/.test(pathname)) return { page: 'privacy' };
+  if (/^\/(about|privacy)\/?$/.test(pathname)) return { page: 'about' };
+  if (/^\/admin\/?$/.test(pathname)) return { page: 'admin' };
   if (/^\/imprint\/?$/.test(pathname)) return { page: 'imprint' };
   const home = /^\/([a-z]{2}(?:-[A-Za-z0-9]+)?)\/?$/.exec(pathname);
   if (home && isLanguage(home[1]!)) return { page: 'home', language: home[1] };
@@ -27,10 +29,17 @@ export function parseRoute(pathname: string): Route {
 /** The heading that also names the tab; the start page and events name themselves. */
 export function headingKey(
   route: Route
-): 'privacy.title' | 'imprint.title' | 'notFound.title' | null {
+):
+  | 'about.title'
+  | 'siteAdmin.title'
+  | 'imprint.title'
+  | 'notFound.title'
+  | null {
   switch (route.page) {
-    case 'privacy':
-      return 'privacy.title';
+    case 'about':
+      return 'about.title';
+    case 'admin':
+      return 'siteAdmin.title';
     case 'imprint':
       return 'imprint.title';
     case 'not-found':

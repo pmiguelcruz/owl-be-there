@@ -22,7 +22,6 @@ import { liveHidden, liveOpenDay, liveSelection } from '../lib/groupState.ts';
 import { CalendarGrid, type HeatInfo } from './CalendarGrid.tsx';
 import { PanelHeadingLevel } from './EventViews.tsx';
 import { CheckIcon, NoteIcon, StarIcon } from './icons.tsx';
-import { Owl } from './Owl.tsx';
 import { Button, Chip, Dialog, Notice } from './ui.tsx';
 
 interface GroupViewProps {
@@ -126,7 +125,6 @@ export function GroupView(props: GroupViewProps) {
   if (!anyAnswered) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <Owl mood="sleeping" size={110} />
         <p className="text-lg font-extrabold">{t('group.empty.title')}</p>
         <p className="max-w-sm text-muted">{t('group.empty.text')}</p>
         {waitingNote}

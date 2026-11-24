@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { EventTheme } from './event-theme.js';
 import { isValidISODate } from './dates.js';
-import { EMOJI_KEYS } from './emoji.js';
+import { DEFAULT_EMOJI, EMOJI_KEYS } from './emoji.js';
 import { ID_PATTERN } from './ids.js';
 import { LIMITS } from './limits.js';
 import {
@@ -87,7 +88,8 @@ export const CreateEventBody = z.strictObject({
   title: requiredLine(LIMITS.title),
   description: paragraph(LIMITS.description).optional(),
   location: line(LIMITS.location).optional(),
-  emoji: Emoji,
+  emoji: Emoji.default(DEFAULT_EMOJI),
+  theme: EventTheme.optional(),
   creatorName: line(LIMITS.creatorName).optional(),
   language: LanguageSchema,
   durationDays: z.int().min(1).max(LIMITS.durationDays),
@@ -185,7 +187,7 @@ const EventView = z.object({
   status: EventStatus,
   finalStart: IsoDay.nullable(),
   finalEnd: IsoDay.nullable(),
-  expiresOn: IsoDay,
+  theme: EventTheme.optional(),
   version: z.int(),
   days: z.array(IsoDay),
 });
@@ -194,6 +196,12 @@ export const EventSnapshot = z.object({
   event: EventView,
   participants: z.array(ParticipantView),
 });
+
+export const AdminPinBody = z.strictObject({
+  pin: z.string().regex(/^\d{4}$/),
+});
+
+export const AdminUnlockResponse = z.object({ token: z.string() });
 
 export const CreateEventResponse = z.object({ id: Id, adminToken: z.string() });
 
@@ -225,7 +233,6 @@ export const UpdateParticipantResponse = z.object({
 export const InstanceInfo = z.object({
   version: z.string(),
   creationEnabled: z.boolean(),
-  retentionDays: z.int(),
   logRetentionDays: z.int().nullable(),
   backupRetentionDays: z.int().nullable(),
   operatorName: z.string().nullable(),

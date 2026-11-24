@@ -141,13 +141,7 @@ describe('parseBody', () => {
         (issue) => issue.path
       );
       expect(paths).toEqual(
-        expect.arrayContaining([
-          'title',
-          'emoji',
-          'language',
-          'durationDays',
-          'days',
-        ])
+        expect.arrayContaining(['title', 'language', 'durationDays', 'days'])
       );
     }
   });

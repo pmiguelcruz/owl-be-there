@@ -47,6 +47,14 @@ describe('buildWeeks', () => {
     expect(rows[0]!.days[6]).toBe('2026-10-10');
   });
 
+  it('includes a month’s last day when it falls on Sunday, exactly once', () => {
+    const days = expandRange('2027-01-01', '2027-02-01');
+    for (const first of [SUNDAY, MONDAY]) {
+      const shown = buildWeeks(days, first).flatMap((row) => row.days);
+      expect(shown.filter((day) => day === '2027-01-31')).toHaveLength(1);
+    }
+  });
+
   it('names a month that begins in the middle of the first row on the next row', () => {
     const rows = buildWeeks(expandRange('2026-09-30', '2026-10-08'), MONDAY);
     expect(rows.map((row) => row.monthLabel)).toEqual(['2026-09', '2026-10']);

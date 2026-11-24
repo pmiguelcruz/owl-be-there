@@ -5,12 +5,11 @@ import {
   type ISODate,
   type Weekday,
 } from './dates.js';
-import { expiresOn } from './retention.js';
 import type { EventSnapshotData } from './schemas.js';
 import { splitMarks, type Mark, type Marks } from './selection.js';
 
 /**
- * The example on the start page and in the README: ten people planning a team
+ * The reference event for screenshots and tests: ten people planning a team
  * dinner over the month after the current one.
  *
  * The answers are rules over weekdays and parts of the month, not dates, so the
@@ -125,7 +124,6 @@ export function exampleSnapshot(options: {
   notes?: Readonly<Record<string, string>>;
 }): EventSnapshotData {
   const days = monthAfter(options.today);
-  const last = days[days.length - 1]!;
   return {
     event: {
       id: EVENT_ID,
@@ -140,13 +138,6 @@ export function exampleSnapshot(options: {
       status: 'open',
       finalStart: null,
       finalEnd: null,
-      expiresOn: expiresOn({
-        lastWriteDay: options.today,
-        lastCandidateDay: last,
-        finalEnd: null,
-        // The sample people have answered.
-        answered: true,
-      }),
       version: 1,
       days,
     },

@@ -6,3 +6,6 @@ export const PARTICIPANT_HEADER = 'x-participant-token';
 
 /** The ETag of the event snapshot at `version`. */
 export const snapshotEtag = (version: number): string => `"v${version}"`;
+
+/** The short-lived site admin credential for creating events. */
+export const CREATION_HEADER = 'x-creation-token';

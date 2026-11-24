@@ -10,7 +10,9 @@ import {
   writeFileSync,
   writeSync,
 } from 'node:fs';
+import { constants } from 'node:os';
 import { join } from 'node:path';
+import { getSystemErrorName } from 'node:util';
 
 /**
  * The key participant tokens are signed with.
@@ -70,7 +72,10 @@ function create(path: string, content: string): void {
       code === 'EPERM' ||
       code === 'ENOSYS' ||
       code === 'ENOTSUP' ||
-      code === 'EOPNOTSUPP'
+      code === 'EOPNOTSUPP' ||
+      // Darwin's EOPNOTSUPP can be distinct from libuv's ENOTSUP.
+      (process.platform === 'darwin' &&
+        code === getSystemErrorName(-constants.errno.EOPNOTSUPP))
     ) {
       try {
         writeFileSync(path, content, { flag: 'wx', mode: 0o600 });

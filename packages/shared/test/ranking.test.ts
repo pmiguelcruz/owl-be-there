@@ -550,6 +550,8 @@ describe('heat', () => {
     expect(heatLevel(Number.NaN)).toBe(0);
     expect(heatLevel(0.01)).toBe(1);
     expect(heatLevel(0.5)).toBe(3);
+    expect(heatLevel(5 / 6)).toBe(4);
+    expect(heatLevel(0.99)).toBe(4);
     expect(heatLevel(1)).toBe(5);
     expect(heatLevel(7)).toBe(5);
   });

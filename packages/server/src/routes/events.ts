@@ -1,3 +1,4 @@
+import { CreationAccess } from '../auth/creation.js';
 import { randomInt } from 'node:crypto';
 import {
   addDays,
@@ -5,6 +6,8 @@ import {
   buildIcs,
   candidateBlocks,
   checkCandidateDays,
+  AdminPinBody,
+  CREATION_HEADER,
   CreateEventBody,
   isId,
   LIMITS,
@@ -175,16 +178,54 @@ export function registerEventRoutes(
 ): void {
   const { config } = ctx;
   const ceiling = new HourlyCeiling();
+  const access = config.adminPin
+    ? new CreationAccess(ctx.secret, config.adminPin)
+    : null;
+
+  const requireCreationEnabled = () => {
+    if (!config.creationEnabled || !access) {
+      throw new ApiError(
+        503,
+        'creation_disabled',
+        'This instance does not take new events'
+      );
+    }
+    return access;
+  };
+
+  app.post(
+    '/api/admin/unlock',
+    { config: limit(config, 5, '15 minutes') },
+    async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      const policy = requireCreationEnabled();
+      const { pin } = parseBody(AdminPinBody, request.body);
+      const result = policy.unlock(pin, ctx.clock.now());
+      if (result === 'limited') {
+        throw new ApiError(
+          429,
+          'rate_limited',
+          'Too many PIN attempts; try again later'
+        );
+      }
+      if (result === 'invalid') {
+        throw new ApiError(403, 'invalid_pin', 'Incorrect PIN');
+      }
+      return reply.send(result);
+    }
+  );
 
   app.post(
     '/api/events',
     { config: limit(config, 10, '1 hour', 'creation_limit') },
     async (request, reply) => {
-      if (!config.creationEnabled) {
+      reply.header('cache-control', 'no-store');
+      const policy = requireCreationEnabled();
+      if (!policy.allows(header(request, CREATION_HEADER), ctx.clock.now())) {
         throw new ApiError(
-          503,
-          'creation_disabled',
-          'This instance does not take new events'
+          403,
+          'creation_locked',
+          'Unlock the admin page to create an event'
         );
       }
       const body = parseBody(CreateEventBody, request.body);
@@ -220,6 +261,7 @@ export function registerEventRoutes(
           description: body.description || null,
           location: body.location || null,
           emoji: body.emoji,
+          theme: body.theme,
           creatorName: body.creatorName || null,
           language: body.language,
           durationDays: body.durationDays,

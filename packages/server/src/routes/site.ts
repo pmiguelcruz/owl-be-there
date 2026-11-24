@@ -1,13 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import fastifyStatic from '@fastify/static';
-import {
-  hasImprint,
-  isId,
-  LANGUAGES,
-  RETENTION_DAYS,
-  type Language,
-} from '@owl/shared';
+import { hasImprint, isId, LANGUAGES, type Language } from '@owl/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { limit, type AppContext } from '../context.js';
 import { snapshot } from '../db/repo.js';
@@ -31,8 +25,7 @@ export function registerInstanceRoutes(
   app.get('/api/instance', async (_request, reply) =>
     reply.header('cache-control', 'no-cache').send({
       version: ctx.version,
-      creationEnabled: config.creationEnabled,
-      retentionDays: RETENTION_DAYS,
+      creationEnabled: config.creationEnabled && config.adminPin !== null,
       logRetentionDays: config.logRetentionDays,
       backupRetentionDays: config.backupRetentionDays,
       operatorName: config.operatorName,
@@ -121,9 +114,24 @@ export async function registerSite(
         .send(sitemap(config.publicUrl, { imprint }))
     );
     for (const url of withSlash('/privacy')) {
+      app.get(url, async (_request, reply) => reply.redirect('/about', 308));
+    }
+    for (const url of withSlash('/about')) {
       app.get(url, async (_request, reply) =>
-        page(reply, defaultHead(config.publicUrl, '/privacy'))
+        page(reply, defaultHead(config.publicUrl, '/about'))
       );
+    }
+    for (const url of withSlash('/admin')) {
+      app.get(url, async (_request, reply) => {
+        reply.header('x-robots-tag', 'noindex, nofollow');
+        return page(
+          reply,
+          defaultHead(config.publicUrl, '/admin'),
+          200,
+          'en',
+          'no-store'
+        );
+      });
     }
     if (imprint) {
       for (const url of withSlash('/imprint')) {

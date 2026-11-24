@@ -11,16 +11,9 @@
   <a href="https://scorecard.dev/viewer/?uri=github.com/ni-c/owl-be-there"><img src="https://api.scorecard.dev/projects/github.com/ni-c/owl-be-there/badge" alt="OpenSSF Scorecard" /></a>
 </p>
 
-Try it at **[owlbethere.app](https://owlbethere.app)**, no account needed, or [host it yourself](#self-hosting): one container, one SQLite file.
+This is [Pedro’s fork](https://github.com/pmiguelcruz/owl-be-there) of [Owl Be There](https://github.com/ni-c/owl-be-there), a whole-day group scheduling tool inspired by [Rallly](https://github.com/lukevella/rallly) and [Crab Fit](https://github.com/GRA0007/crab.fit). Participants open a link, mark their availability, and check the group’s calendar. No accounts.
 
-Owl Be There helps a group pick a day — for a match, a tournament, a hike or a barbecue. The organiser picks the candidate days, everyone marks the days they can make it on a calendar, and the calendar turns into a heatmap that shows at a glance when the whole group is free.
-
-It is a cross between [Rallly](https://github.com/lukevella/rallly) (whole-day polls without accounts) and [Crab Fit](https://github.com/GRA0007/crab.fit) (paint your availability, see the group's heatmap) — with whole days on a calendar instead of lists or time slots.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png" />
-  <img src="docs/screenshot-light.png" alt="An example: ten people answered for a team dinner. On the left the days one of them can make, on the right the whole group as a heatmap, with the best day standing out." />
-</picture>
+The home page lists events remembered by this browser. To create an event, open **Admin**, enter the instance PIN, and choose **Plan an event**. Choose a gradient and a symmetric shape for the event wallpaper. Share the participant link with the group and keep the organiser link for managing that event.
 
 ## Features
 
@@ -30,7 +23,7 @@ It is a cross between [Rallly](https://github.com/lukevella/rallly) (whole-day p
 - **Multi-day events:** looking for a whole weekend? Ask for two days in a row and get the best blocks.
 - **No accounts:** your name, and a password only if you want one. The organiser gets a private admin link to edit the event, correct entries, close it, and choose the date — with a calendar file and a Google Calendar link for everyone.
 - **Sharing:** the system share sheet with a ready-made invitation, the link to copy, and a QR code. Messengers show a link preview with the title, the state of the poll and the candidate days as a small calendar coloured like the heatmap — never names, never the description.
-- **Minimal data:** no e-mail addresses, no IP addresses, no cookies, no tracking, no third-party requests. Events delete themselves 90 days after the last change; an event nobody answered goes even if its days lie later, an answered one never before its last candidate day.
+- **Minimal data:** no e-mail addresses, no IP addresses, no cookies, no tracking, no third-party requests. Events stay until manually deleted.
 - **Made for phones:** the whole range in one calendar, big tap targets, dark mode, Arabic, Persian and Urdu (right to left), Czech, Dutch, English, Finnish, French, German, Indonesian, Italian, Japanese, Korean, Norwegian Bokmål, Polish, Portuguese (Portugal and Brazil), Russian, Simplified Chinese, Spanish (Spain and Latin America), Swedish, Traditional Chinese, Turkish, Ukrainian and Vietnamese.
 - **Self-hostable:** one container, one SQLite file.
 
@@ -41,32 +34,28 @@ Link previews draw everything else in Nunito, bundled with the server under its 
 
 ## Self-hosting
 
-The image is published for amd64 and arm64 as `ghcr.io/ni-c/owl-be-there`. It runs as a non-root user on a read-only root filesystem and keeps everything it writes in `/data`: the database `owl.db` and the server secret `secret.key`, which signs participant tokens.
+Build the container from this fork. It runs as a non-root user on a read-only root filesystem and keeps everything it writes in `/data`: the database `owl.db` and the server secret `secret.key`, which signs participant and site-admin tokens.
 
 1. Copy [`compose.example.yaml`](compose.example.yaml) to `compose.yaml` and set `PUBLIC_URL`.
 2. Create the data directory for the container's user: `mkdir data && sudo chown 1000:1000 data`.
-3. `docker compose up -d`, then put a reverse proxy with TLS in front (below).
+3. Set `ADMIN_PIN` to your four-digit PIN in an ignored, owner-readable `.env` file.
+4. Run `docker compose up -d --build` and put a reverse proxy with TLS in front (below).
 
 ### Configuration
 
-| Variable                | Default                 | Meaning                                                                                                                                                                                                        |
-| ----------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PUBLIC_URL`            | `http://localhost:8080` | The public origin, without a path. The only source of absolute URLs (link previews, calendar files) — moving to another domain means changing this and nothing else.                                           |
-| `TRUST_PROXY`           | `127.0.0.1,::1`         | Addresses or CIDR ranges whose `X-Forwarded-For` is believed. Behind Docker's port publishing that is the compose network's gateway, so trust that address. `false` trusts nobody.                             |
-| `PORT` / `HOST`         | `8080` / `0.0.0.0`      | Where the server listens inside the container.                                                                                                                                                                 |
-| `CREATION_ENABLED`      | `true`                  | `false` stops new events from being created; existing ones keep working. The emergency switch against abuse.                                                                                                   |
-| `MAX_EVENTS`            | `10000`                 | No new events beyond this many.                                                                                                                                                                                |
-| `MAX_DB_BYTES`          | unset                   | No new events once the data in the database holds this many bytes; space freed by deletions counts as free. A full event takes about 3 MB.                                                                     |
-| `OWL_SECRET`            | generated               | At least 32 characters. Normally left unset: the server creates `/data/secret.key` on first start.                                                                                                             |
-| `OPERATOR_NAME`         | —                       | Shown on the privacy page as the operator, and on the legal notice.                                                                                                                                            |
-| `OPERATOR_ADDRESS`      | —                       | The operator's postal address for the legal notice: one line with the parts separated by commas (`Musterstraße 1, 12345 Musterstadt, Germany`), or one part per line. Each part gets its own line on the page. |
-| `OPERATOR_CONTACT`      | —                       | A contact address for the privacy page and the legal notice, also for abuse reports. An e-mail address becomes a `mailto:` link on the legal notice.                                                           |
-| `IMPRINT_URL`           | —                       | A link to a legal notice elsewhere. When set, the footer's "Imprint" link goes there instead of to the built-in page.                                                                                          |
-| `LOG_RETENTION_DAYS`    | —                       | How long your reverse proxy keeps access logs, stated on the privacy page. The application itself logs no addresses.                                                                                           |
-| `BACKUP_RETENTION_DAYS` | —                       | How long deleted events can linger in backups, stated on the privacy page.                                                                                                                                     |
-| `LOG_LEVEL`             | `info`                  | `fatal`, `error`, `warn`, `info`, `debug` or `trace`. Requests are never logged.                                                                                                                               |
+| Variable           | Default                 | Meaning                                                                                                                                                                            |
+| ------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_URL`       | `http://localhost:8080` | The public origin, without a path. The only source of absolute URLs (link previews, calendar files) — moving to another domain means changing this and nothing else.               |
+| `TRUST_PROXY`      | `127.0.0.1,::1`         | Addresses or CIDR ranges whose `X-Forwarded-For` is believed. Behind Docker's port publishing that is the compose network's gateway, so trust that address. `false` trusts nobody. |
+| `PORT` / `HOST`    | `8080` / `0.0.0.0`      | Where the server listens inside the container.                                                                                                                                     |
+| `ADMIN_PIN`        | unset                   | Server-side four-digit PIN for new event creation. With no PIN, existing events still work and creation is disabled.                                                               |
+| `CREATION_ENABLED` | `true`                  | `false` stops new events from being created; existing ones keep working. The emergency switch against abuse.                                                                       |
+| `MAX_EVENTS`       | `10000`                 | No new events beyond this many.                                                                                                                                                    |
+| `MAX_DB_BYTES`     | unset                   | No new events once the data in the database holds this many bytes; space freed by deletions counts as free. A full event takes about 3 MB.                                         |
+| `OWL_SECRET`       | generated               | At least 32 characters. Normally left unset: the server creates `/data/secret.key` on first start.                                                                                 |
+| `LOG_LEVEL`        | `info`                  | `fatal`, `error`, `warn`, `info`, `debug` or `trace`. Requests are never logged.                                                                                                   |
 
-The built-in legal notice (`/imprint`, in the footer between "Privacy" and the source link) appears once `OPERATOR_NAME`, `OPERATOR_ADDRESS` and `OPERATOR_CONTACT` are all set. It follows the German "Anbieterkennzeichnung" (§ 5 DDG, § 18 Abs. 1 MStV), says that the project is private and free of advertising, and is translated into every language of the app. With `IMPRINT_URL` set the footer links there instead; with neither, there is no link and `/imprint` is an unknown page. Check with a lawyer that the text fits your situation: it is a template, not legal advice.
+The instance applies per-network and instance-wide PIN attempt limits. An unlock lasts up to 30 minutes in the current tab. The existing organiser key for each event is separate.
 
 ### Reverse proxy
 
@@ -117,15 +106,15 @@ docker compose exec owl node packages/server/dist/cli.js list 2027-03-01
 docker compose exec owl node packages/server/dist/cli.js purge 2027-03-01 --yes
 ```
 
-`stats` counts events, participants and marks; `weeks` counts per ISO week the events created, how many of them somebody answered and the people who joined — numbers only, reaching back as far as retention keeps events. `delete` removes an event at once, for abuse reports. `list` shows the events created since a day with how many people answered (marked days), and `purge` deletes those among them that nobody answered — for cleaning up after a flood of new events; without `--yes` it only says how many it would delete. Expired events are swept on start and every hour.
+`stats` counts events, participants and marks; `weeks` counts per ISO week the events created, how many of them somebody answered and the people who joined. `delete` removes an event at once, for abuse reports. `list` shows the events created since a day with how many people answered (marked days), and `purge` deletes those among them that nobody answered — for cleaning up after a flood of new events; without `--yes` it only says how many it would delete. No events are deleted on a schedule.
 
 The CLI never creates or upgrades a database: the server must have started once on that data directory, and after an update of the image it has to be started once before the CLI works again.
 
-**Backups:** copy `owl.db` with SQLite's online backup (`sqlite3 data/owl.db ".backup backup.db"`) rather than the file itself, which may be mid-write. Keep `secret.key` too; without it, participants with a password must log in again. Keep backups only as long as the privacy page says.
+**Backups:** copy `owl.db` with SQLite's online backup (`sqlite3 data/owl.db ".backup backup.db"`) rather than the file itself, which may be mid-write. Keep `secret.key` too; without it, participants with a password must log in again.
 
 ## Development
 
-Node 26 and npm. See [CONTRIBUTING.md](CONTRIBUTING.md) for the commands and the conventions, and [docs/design.md](docs/design.md) for the colours and why they are what they are.
+Use Node 26. Run `npm ci`, add `ADMIN_PIN` to the local `.env` file, and run `npm run dev`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the commands and the conventions, and [docs/design.md](docs/design.md) for the colours and why they are what they are.
 
 ## License
 

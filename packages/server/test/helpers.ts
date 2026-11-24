@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { ADMIN_HEADER } from '@owl/shared';
+import { ADMIN_HEADER, CREATION_HEADER } from '@owl/shared';
 import type {
   FastifyInstance,
   InjectOptions,
@@ -12,6 +12,8 @@ import { migrate } from '../src/db/migrations.js';
 import { Db } from '../src/db/sqlite.js';
 import type { ThrottleLimits } from '../src/auth/throttle.js';
 import type { StreamLimits } from '../src/sse.js';
+
+export const TEST_ADMIN_PIN = '4182';
 
 export const CLIENT_DIR = fileURLToPath(
   new URL('./fixtures/client', import.meta.url)
@@ -48,6 +50,7 @@ export async function testApp(options: TestAppOptions = {}): Promise<TestApp> {
     PUBLIC_URL: 'https://owl.example.org',
     LOG_LEVEL: 'info',
     RATE_LIMIT_MULTIPLIER: '1000',
+    ADMIN_PIN: TEST_ADMIN_PIN,
     ...(options.site !== false && { CLIENT_DIR }),
     ...options.env,
   });
@@ -83,6 +86,19 @@ export function eventBody(
   };
 }
 
+export async function creationHeaders(
+  app: FastifyInstance
+): Promise<Record<string, string>> {
+  const response = await app.inject({
+    method: 'POST',
+    url: '/api/admin/unlock',
+    payload: { pin: TEST_ADMIN_PIN },
+  });
+  if (response.statusCode !== 200)
+    throw new Error(`unlock failed: ${response.body}`);
+  return { [CREATION_HEADER]: response.json().token };
+}
+
 export async function createEvent(
   app: FastifyInstance,
   overrides: Record<string, unknown> = {}
@@ -90,6 +106,7 @@ export async function createEvent(
   const response = await app.inject({
     method: 'POST',
     url: '/api/events',
+    headers: await creationHeaders(app),
     payload: eventBody(overrides),
   });
   if (response.statusCode !== 201)

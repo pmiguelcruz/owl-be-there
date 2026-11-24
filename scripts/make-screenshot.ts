@@ -1,19 +1,9 @@
 /**
- * Renders the pictures of the example in the README: the start page's live
- * example — next month's team dinner — in its browser window, as a desktop
- * browser shows it, once light and once dark. Then renews `og.png`, the
- * default link-preview picture of the start pages and the privacy page (an
- * event link draws its own, see `packages/server/src/preview.ts`): 1200 × 630,
- * the owl and the name. This is the only way `og.png` is made; run it after
- * changing the owl, the name or the heatmap colours.
+ * Capture a sample event in light and dark mode and regenerate the default
+ * link preview. The sample exists only in the temporary screenshot database.
  *
  *     npm run build
- *     npm run screenshot                    # docs/ and packages/client/public
- *     npm run screenshot -- --out <dir>     # all three into <dir>, as CI does
- *
- * The start page builds the example itself, so this only has to look: it runs
- * the built server on a temporary data directory and Playwright's Chromium,
- * which the end-to-end suite installs. The `og.png` picture needs no server.
+ *     npm run screenshot -- --out <dir>
  */
 import { spawn } from 'node:child_process';
 import {
@@ -29,7 +19,12 @@ import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { PREVIEW_COLOURS } from '@owl/shared';
+import {
+  CREATION_HEADER,
+  exampleSnapshot,
+  PREVIEW_COLOURS,
+  todayUTC,
+} from '@owl/shared';
 import { chromium, type Browser, type Page } from '@playwright/test';
 
 const root = resolve(import.meta.dirname, '..');
@@ -85,48 +80,81 @@ async function waitForServer(failure: () => Error | null): Promise<void> {
   throw new Error('The server did not start');
 }
 
-async function shoot(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.goto(base);
-  const frame = page.locator('[data-browser-frame]');
-  await frame.getByRole('grid', { name: 'Group' }).waitFor();
-  // Nothing hovered or focused in the picture.
-  await page.mouse.move(0, 0);
-  // Everything around the window hidden and see-through, so nothing reaches
-  // into its margin — through the CSSOM, as the content security policy
-  // refuses a style tag.
-  await frame.evaluate((subject) => {
-    for (const element of document.querySelectorAll<HTMLElement>('*')) {
-      if (subject.contains(element)) continue;
-      if (!element.contains(subject)) element.style.visibility = 'hidden';
-      element.style.background = 'transparent';
-      element.style.boxShadow = 'none';
-    }
+const SCREENSHOT_PIN = '4182';
+
+async function postJson(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {}
+) {
+  const response = await fetch(base + path, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
   });
-  // In page coordinates: a full-page clip counts from the top of the page,
-  // not from wherever it is scrolled to.
-  const box = await frame.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    return {
-      x: rect.x + window.scrollX,
-      y: rect.y + window.scrollY,
-      width: rect.width,
-      height: rect.height,
-    };
+  if (!response.ok) throw new Error(`POST ${path}: ${response.status}`);
+  return response.json();
+}
+
+async function sampleEvent(): Promise<string> {
+  const { event, participants } = exampleSnapshot({
+    today: todayUTC(),
+    title: 'Team dinner',
+    anna: new Map(),
   });
-  const margin = 32;
-  const path = join(outDir, `screenshot-${theme}.png`);
-  await page.screenshot({
-    path,
-    fullPage: true,
-    omitBackground: true,
-    animations: 'disabled',
-    clip: {
-      x: box.x - margin,
-      y: box.y - margin,
-      width: box.width + 2 * margin,
-      height: box.height + 2 * margin,
+  const { token } = await postJson('/api/admin/unlock', {
+    pin: SCREENSHOT_PIN,
+  });
+  const { id } = await postJson(
+    '/api/events',
+    {
+      title: event.title,
+      days: event.days,
+      language: 'en',
+      durationDays: 1,
+      theme: {
+        gradient: { start: '#52b9b8', end: '#9a69cf', angle: 25 },
+        shape: 98253,
+      },
     },
-  });
+    { [CREATION_HEADER]: token }
+  );
+  const path = `/api/events/${id}`;
+  for (const person of participants) {
+    const { participantId, token } = await postJson(`${path}/session`, {
+      name: person.name,
+    });
+    const response = await fetch(
+      `${base}${path}/participants/${participantId}/marks`,
+      {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          'x-participant-token': token,
+        },
+        body: JSON.stringify({
+          baseRev: 0,
+          yes: person.yes,
+          maybe: person.maybe,
+        }),
+      }
+    );
+    if (!response.ok)
+      throw new Error(`Could not seed sample responses: ${response.status}`);
+  }
+  return id;
+}
+
+async function shoot(
+  page: Page,
+  id: string,
+  theme: 'light' | 'dark'
+): Promise<void> {
+  await page.goto(`${base}/e/${id}`);
+  await page.getByRole('grid', { name: 'Group' }).waitFor();
+  await page.mouse.move(0, 0);
+  const path = join(outDir, `screenshot-${theme}.png`);
+  await page.screenshot({ path, fullPage: true, animations: 'disabled' });
   console.log(`screenshot-${theme}.png: ${statSync(path).size} bytes`);
 }
 
@@ -201,6 +229,8 @@ const server = spawn('node', ['packages/server/dist/index.js'], {
     CLIENT_DIR: 'packages/client/dist',
     DATA_DIR: dataDir,
     LOG_LEVEL: 'warn',
+    CREATION_ENABLED: 'true',
+    ADMIN_PIN: SCREENSHOT_PIN,
   },
 });
 
@@ -228,6 +258,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 try {
   mkdirSync(outDir, { recursive: true });
   await waitForServer(() => serverFailure);
+  const id = await sampleEvent();
   const browser = await chromium.launch();
   try {
     for (const theme of ['light', 'dark'] as const) {
@@ -241,7 +272,7 @@ try {
         localStorage.setItem('owl.theme', JSON.stringify(choice));
         localStorage.setItem('owl.lang', JSON.stringify('en'));
       }, theme);
-      await shoot(await context.newPage(), theme);
+      await shoot(await context.newPage(), id, theme);
       await context.close();
     }
     await shootOg(browser);

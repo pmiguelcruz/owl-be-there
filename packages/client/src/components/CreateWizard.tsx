@@ -2,22 +2,19 @@ import {
   addDays,
   compareISODate,
   DEFAULT_EMOJI,
-  EMOJI_KEYS,
-  EMOJIS,
   expandRange,
   forgetChangedWeekdays,
   isValidISODate,
   keepChosenDays,
   LIMITS,
   todayLocal,
-  type EmojiKey,
   type ISODate,
   type Mark,
   type Weekday,
 } from '@owl/shared';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useI18n } from '../i18n/index.tsx';
-import { api } from '../lib/api.ts';
+import { ApiFailure, api } from '../lib/api.ts';
 import { daysProblem, rangeProblemKey, type Problem } from '../lib/dayEdit.ts';
 import { createErrorMessage } from '../lib/errors.ts';
 import {
@@ -27,11 +24,11 @@ import {
   invisibleProblem,
   parseRoster,
 } from '../lib/forms.ts';
-import { rovingKeyDown } from '../lib/roving.ts';
 import { firstWeekdayFor, weekdayName, weekdayOrder } from '../lib/locale.ts';
 import { rememberEvent, writeAdminToken } from '../lib/prefs.ts';
 import { navigate } from '../lib/route.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
+import { randomGradients, randomShapes, ThemePicker } from './ThemePicker.tsx';
 import { CalendarGrid } from './CalendarGrid.tsx';
 import { Button, Card, Field, Notice, TextArea, TextInput } from './ui.tsx';
 
@@ -43,14 +40,25 @@ const STEP_NUMBERS = Array.from({ length: STEPS }, (_, i) => i + 1);
  * weekdays, then fine-tuned by painting in the same calendar the participants
  * will use — so the organiser has used it once before sending the link.
  */
-export function CreateWizard({ onCancel }: { onCancel(): void }) {
+export function CreateWizard({
+  token,
+  onCancel,
+  onLocked,
+}: {
+  token: string | null;
+  onCancel(): void;
+  onLocked(): void;
+}) {
   const { t, tn, number, language, locale } = useI18n();
   const today = todayLocal();
   const firstWeekday = useMemo(() => firstWeekdayFor(navigator.language), []);
 
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState<EmojiKey>(DEFAULT_EMOJI);
+  const [gradients, setGradients] = useState(randomGradients);
+  const [shapes, setShapes] = useState(randomShapes);
+  const [gradientIndex, setGradientIndex] = useState(0);
+  const [shapeIndex, setShapeIndex] = useState(0);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [creatorName, setCreatorName] = useState('');
@@ -71,7 +79,6 @@ export function CreateWizard({ onCancel }: { onCancel(): void }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const legendRef = useRef<HTMLLegendElement>(null);
-  const arrived = useRef(false);
 
   // A language reload would lose what has been typed so far.
   useEffect(
@@ -82,13 +89,10 @@ export function CreateWizard({ onCancel }: { onCancel(): void }) {
 
   // A new step starts at its heading, which also tells a screen reader.
   useEffect(() => {
-    if (!arrived.current) {
-      arrived.current = true;
-      return;
-    }
+    if (!token) return;
     legendRef.current?.focus({ preventScroll: true });
     formRef.current?.scrollIntoView({ block: 'start' });
-  }, [step]);
+  }, [step, token]);
 
   const rangeProblem = useMemo(() => {
     const key = rangeProblemKey(from, to, today);
@@ -154,31 +158,42 @@ export function CreateWizard({ onCancel }: { onCancel(): void }) {
       if (validate(step)) setStep(step + 1);
       return;
     }
-    if (!validate(1) || !validate(2) || !validate(3)) return;
+    if (!token || submitting || !validate(1) || !validate(2) || !validate(3))
+      return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const names = parsedRoster.names;
-      const created = await api.createEvent({
-        title,
-        emoji,
-        language,
-        durationDays: duration,
-        days: candidates,
-        ...(description.trim() && { description }),
-        ...(location.trim() && { location }),
-        ...(creatorName.trim() && { creatorName }),
-        ...(minCount.trim() && { minCount: Number(minCount) }),
-        ...(names.length > 0 && { roster: names }),
-      });
+      const created = await api.createEvent(
+        {
+          title,
+          theme: {
+            gradient: gradients[gradientIndex]!,
+            shape: shapes[shapeIndex]!,
+          },
+          language,
+          durationDays: duration,
+          days: candidates,
+          ...(description.trim() && { description }),
+          ...(location.trim() && { location }),
+          ...(creatorName.trim() && { creatorName }),
+          ...(minCount.trim() && { minCount: Number(minCount) }),
+          ...(names.length > 0 && { roster: names }),
+        },
+        token
+      );
       writeAdminToken(created.id, created.adminToken);
       rememberEvent(
-        { id: created.id, title: title.trim(), emoji },
+        { id: created.id, title: title.trim(), emoji: DEFAULT_EMOJI },
         'organiser'
       );
       navigate(`/e/${created.id}`, { state: { created: true } });
     } catch (error) {
-      setSubmitError(createErrorMessage(error, t, { count: duration }));
+      if (error instanceof ApiFailure && error.code === 'creation_locked') {
+        onLocked();
+      } else {
+        setSubmitError(createErrorMessage(error, t, { count: duration }));
+      }
       setSubmitting(false);
     }
   };
@@ -229,45 +244,22 @@ export function CreateWizard({ onCancel }: { onCancel(): void }) {
                 />
               )}
             </Field>
-            <div className="flex flex-col gap-2">
-              <span className="font-bold" id="emoji-label">
-                {t('create.emoji')}
-              </span>
-              <div
-                role="radiogroup"
-                aria-labelledby="emoji-label"
-                className="flex flex-wrap gap-1.5"
-              >
-                {EMOJI_KEYS.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="radio"
-                    aria-checked={emoji === key}
-                    aria-label={t(`emoji.${key}`)}
-                    title={t(`emoji.${key}`)}
-                    // One stop in the tab order; the arrow keys move within.
-                    tabIndex={emoji === key ? 0 : -1}
-                    onClick={() => setEmoji(key)}
-                    onKeyDown={(event) =>
-                      rovingKeyDown(
-                        event,
-                        EMOJI_KEYS.indexOf(emoji),
-                        EMOJI_KEYS.length,
-                        (next) => setEmoji(EMOJI_KEYS[next]!)
-                      )
-                    }
-                    className={`grid size-11 place-items-center rounded-2xl text-2xl transition ${
-                      emoji === key
-                        ? 'bg-brand-soft ring-2 ring-brand'
-                        : 'hover:bg-sunken'
-                    }`}
-                  >
-                    {EMOJIS[key]}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ThemePicker
+              gradients={gradients}
+              shapes={shapes}
+              gradientIndex={gradientIndex}
+              shapeIndex={shapeIndex}
+              selectGradient={setGradientIndex}
+              selectShape={setShapeIndex}
+              refreshGradients={() => {
+                setGradients(randomGradients());
+                setGradientIndex(0);
+              }}
+              refreshShapes={() => {
+                setShapes(randomShapes());
+                setShapeIndex(0);
+              }}
+            />
             <Field
               label={t('create.description')}
               hint={t('create.descriptionHint')}

@@ -1,3 +1,4 @@
+import { startWizard } from '../helpers.ts';
 import { expect, test } from '@playwright/test';
 import {
   createEvent,
@@ -18,8 +19,7 @@ test('a wizard step change moves focus to the step legend, and Back and Cancel a
     return route.fallback();
   });
 
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Plan an event' }).click();
+  await startWizard(page);
   await page.getByLabel('Title').fill('Focus check');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.locator('legend:focus')).toHaveCount(1);

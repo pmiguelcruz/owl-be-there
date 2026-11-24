@@ -2,6 +2,7 @@ import { addDays, answerFor, LIMITS, respondentOf } from '@owl/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createEvent,
+  creationHeaders,
   eventBody,
   getSnapshot,
   participantOf,
@@ -336,6 +337,7 @@ describe('who are you', () => {
       const created = await t.app.inject({
         method: 'POST',
         url: '/api/events',
+        headers: await creationHeaders(t.app),
         payload: eventBody({ roster: ['M\u200D\u0430\u200Dx'] }),
       });
       expect(created.statusCode).toBe(400);

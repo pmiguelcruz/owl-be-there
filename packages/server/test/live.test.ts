@@ -1,8 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { get, type ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { addDays, LIMITS } from '@owl/shared';
-import { getEvent } from '../src/db/repo.js';
+import { buildApp } from '../src/app.js';
 import { networkKey } from '../src/http.js';
 import {
   createEvent,
@@ -87,17 +86,6 @@ describe('live updates', () => {
     expect(events.at(-1)).toBe('event: deleted\ndata: {}');
   });
 
-  it('say goodbye when the sweep deletes the event', async () => {
-    const { id } = await createEvent(t.app);
-    const response = await fetch(`${base}/api/events/${id}/stream`);
-    const reading = readEvents(response, 5);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    t.clock.advanceDays(200);
-    expect(t.app.sweep()).toBe(1);
-    expect((await reading).at(-1)).toBe('event: deleted\ndata: {}');
-    expect(t.app.hub.size).toBe(0);
-  });
-
   it('refuse a stream for an unknown event', async () => {
     const response = await fetch(`${base}/api/events/AAAAAAAAAAAA/stream`);
     expect(response.status).toBe(404);
@@ -143,71 +131,27 @@ describe('live updates', () => {
   });
 });
 
-describe('the sweep', () => {
-  it('keeps an event to its last day and deletes it the day after', async () => {
+describe('event retention', () => {
+  it('keeps an existing event and its responses after its former expiry date and restart', async () => {
     const { id } = await createEvent(t.app);
-    const expires = getEvent(t.db, id)!.expires_on;
-    expect(expires).toBe('2027-05-30');
-    t.clock.time = Date.UTC(2027, 4, 30, 23, 59);
-    expect(t.app.sweep()).toBe(0);
-    t.clock.time = Date.UTC(2027, 4, 31, 0, 1);
-    expect(t.app.sweep()).toBe(1);
-    expect(getEvent(t.db, id)).toBeUndefined();
-  });
-
-  it('measures from the last change', async () => {
-    const { id } = await createEvent(t.app);
-    t.clock.advanceDays(60);
-    await join(t.app, id, 'Max');
-    expect(getEvent(t.db, id)!.expires_on).toBe('2027-07-29');
-    t.clock.time = Date.UTC(2027, 5, 1);
-    expect(t.app.sweep()).toBe(0);
-  });
-});
-
-describe('how long an event lives', () => {
-  // The latest day a new candidate day may take, from 2027-03-01: the horizon
-  // and one day of slack for a client ahead of UTC.
-  const farDay = addDays('2027-03-01', LIMITS.horizon + 1);
-
-  it('is ninety days for an event nobody answered, however late its days', async () => {
-    const { id } = await createEvent(t.app, {
-      days: [farDay],
-      roster: ['Ana'],
+    const person = await join(t.app, id, 'Max');
+    await mark(t.app, id, person, WEEKEND);
+    t.db.run("UPDATE events SET expires_on = '2027-03-08' WHERE id = ?", id);
+    t.clock.advanceDays(200);
+    const restarted = await buildApp({
+      config: t.config,
+      db: t.db,
+      secret: Buffer.alloc(32, 7),
+      clock: t.clock,
     });
-    expect(getEvent(t.db, id)!.expires_on).toBe('2027-05-30');
-    const early = await createEvent(t.app, { days: ['2027-02-28'] });
-    expect(getEvent(t.db, early.id)!.expires_on).toBe('2027-05-30');
-    // A name joined under, without marks, does not extend it either.
-    await join(t.app, id, 'Max');
-    expect(getEvent(t.db, id)!.expires_on).toBe('2027-05-30');
-  });
-
-  it('follows the last day once somebody has marks, and falls back without them', async () => {
-    const { id } = await createEvent(t.app, { days: [farDay] });
-    const max = await join(t.app, id, 'Max');
-    expect((await mark(t.app, id, max, [farDay])).statusCode).toBe(200);
-    const capped = addDays('2027-03-01', 730);
-    expect(getEvent(t.db, id)!.expires_on).toBe(capped);
-    // Marks that say "no" to every day are an answer too.
-    expect((await mark(t.app, id, max, [], [], 1)).statusCode).toBe(200);
-    expect(getEvent(t.db, id)!.expires_on).toBe(capped);
-    // The only person with marks goes: the event is unanswered again.
-    t.clock.advanceDays(10);
-    const removed = await t.app.inject({
-      method: 'DELETE',
-      url: `/api/events/${id}/participants/${max.participantId}`,
-      headers: { 'x-participant-token': max.token },
-    });
-    expect(removed.statusCode).toBe(204);
-    expect(getEvent(t.db, id)!.expires_on).toBe('2027-06-09');
-  });
-
-  it('keeps the old rule for an answered event whose days are near', async () => {
-    const { id } = await createEvent(t.app);
-    const max = await join(t.app, id, 'Max');
-    await mark(t.app, id, max, ['2027-03-06']);
-    expect(getEvent(t.db, id)!.expires_on).toBe('2027-05-30');
+    try {
+      const response = await restarted.inject(`/api/events/${id}`);
+      expect(response.statusCode).toBe(200);
+      expect(response.json().event).not.toHaveProperty('expiresOn');
+      expect(response.json().participants[0].yes).toEqual(WEEKEND);
+    } finally {
+      await restarted.close();
+    }
   });
 });
 

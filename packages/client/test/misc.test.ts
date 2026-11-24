@@ -36,17 +36,16 @@ afterEach(() => {
 });
 
 describe('i18n', () => {
-  it('has every English text in each translation, with the same placeholders', () => {
+  it('resolves every translation with the same placeholders, using the English fallback for the fork', () => {
     const placeholders = (text: string) =>
       [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
     for (const language of LANGUAGES) {
       const dictionary = dictionaries.peek(language)!.texts;
-      expect(Object.keys(dictionary).sort()).toEqual(Object.keys(en).sort());
       for (const key of Object.keys(en) as (keyof typeof en)[]) {
-        expect(placeholders(dictionary[key]), key).toEqual(
+        expect(placeholders(dictionary[key] ?? en[key]), key).toEqual(
           placeholders(en[key])
         );
-        expect(dictionary[key].trim(), key).not.toBe('');
+        expect((dictionary[key] ?? en[key]).trim(), key).not.toBe('');
       }
     }
   });
@@ -482,10 +481,10 @@ describe('weekdayName', () => {
 });
 
 describe('routes', () => {
-  it('knows the five pages', () => {
+  it('knows the app routes', () => {
     expect(parseRoute('/')).toEqual({ page: 'home' });
     expect(parseRoute('')).toEqual({ page: 'home' });
-    expect(parseRoute('/privacy')).toEqual({ page: 'privacy' });
+    expect(parseRoute('/privacy')).toEqual({ page: 'about' });
     expect(parseRoute('/e/7gT4kPq2Wx9Z')).toEqual({
       page: 'event',
       id: '7gT4kPq2Wx9Z',
@@ -546,8 +545,8 @@ describe('routes', () => {
   });
 
   it('titles privacy, imprint and unknown paths by their heading, and leaves the others to themselves', () => {
-    expect(headingKey(parseRoute('/privacy'))).toBe('privacy.title');
-    expect(headingKey(parseRoute('/privacy/'))).toBe('privacy.title');
+    expect(headingKey(parseRoute('/privacy'))).toBe('about.title');
+    expect(headingKey(parseRoute('/privacy/'))).toBe('about.title');
     expect(headingKey(parseRoute('/imprint'))).toBe('imprint.title');
     expect(headingKey(parseRoute('/nope'))).toBe('notFound.title');
     // The start page has its tagline, an event its own title.
@@ -561,12 +560,12 @@ describe('routes', () => {
       const dictionary = dictionaries.peek(language)!.texts;
       const name = APP_NAME;
       const titles = [`${name} — ${dictionary['app.tagline']}`];
-      for (const path of ['/privacy', '/imprint', '/nope']) {
-        const heading = dictionary[headingKey(parseRoute(path))!];
+      for (const path of ['/about', '/admin', '/imprint', '/nope']) {
+        const heading = translator(language).t(headingKey(parseRoute(path))!);
         expect(heading.trim(), `${language} ${path}`).not.toBe('');
         titles.push(`${heading} · ${name}`);
       }
-      expect(new Set(titles).size, language).toBe(4);
+      expect(new Set(titles).size, language).toBe(5);
     }
   });
 

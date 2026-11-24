@@ -35,7 +35,7 @@ test('a language address preloads its texts, and the page never shows English fi
   });
   await page.goto('/fa');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-  await expect(page.getByLabel('زبان')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'About' })).toBeVisible();
   await expect(preloaded(page, 'fa')).toHaveCount(1);
   const seen = await page.evaluate(
     () => (window as unknown as { seenLang: string[] }).seenLang
@@ -48,7 +48,7 @@ test('the stored choice is preloaded on the plain start page', async ({
 }) => {
   await page.addInitScript(() => localStorage.setItem('owl.lang', '"ja"'));
   await page.goto('/');
-  await expect(page.getByLabel('言語')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(preloaded(page, 'ja')).toHaveCount(1);
 });
 
@@ -67,16 +67,16 @@ test('a switch keeps the page until the new texts are here, and keeps the focus'
 }, testInfo) => {
   test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
   const release = await holdChunk(page, 'ja');
-  await page.goto('/privacy');
+  await page.goto('/about');
   const select = page.getByLabel('Language');
   await select.focus();
   await select.selectOption('ja');
   // The select shows the choice at once; the page waits for its texts.
   await expect(select).toHaveValue('ja');
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
+  await expect(page).toHaveTitle('About · Owl Be There');
   await expect(select).toBeFocused();
   release();
-  await expect(page).toHaveTitle('プライバシー · Owl Be There');
+  await expect(page).toHaveTitle('About · Owl Be There');
   await expect(page.getByLabel('言語')).toBeFocused();
 });
 
@@ -86,8 +86,8 @@ test('right to left stays until the next language is here', async ({
   const release = await holdChunk(page, 'ja');
   await page.goto('/ar');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.getByRole('link', { name: 'About' }).click();
   await page.getByLabel('اللغة').selectOption('ja');
-  await expect(page).toHaveURL(/\/ja$/);
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   release();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
@@ -102,10 +102,10 @@ test('a language that cannot load reloads the page once, then says so', async ({
   page.on('load', () => {
     loads += 1;
   });
-  await page.goto('/privacy');
+  await page.goto('/about');
   await page.getByLabel('Language').selectOption('ja');
   await expect(page.getByRole('alert')).toContainText('日本語');
-  await expect(page).toHaveTitle('Privacy · Owl Be There');
+  await expect(page).toHaveTitle('About · Owl Be There');
   expect(loads).toBe(2);
   await page.waitForTimeout(500);
   expect(loads).toBe(2);

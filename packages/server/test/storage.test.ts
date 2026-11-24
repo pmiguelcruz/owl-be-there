@@ -32,8 +32,10 @@ import { CHECKPOINT_RETRY_MS, Db } from '../src/db/sqlite.js';
 import {
   adminHeaders,
   createEvent,
+  creationHeaders,
   eventBody,
   FakeClock,
+  TEST_ADMIN_PIN,
   join as joinEvent,
   mark,
   setStatus,
@@ -360,6 +362,7 @@ describe('what a changed participant leaves in the files', () => {
     migrate(db);
     app = await buildApp({
       config: loadConfig({
+        ADMIN_PIN: TEST_ADMIN_PIN,
         PUBLIC_URL: 'https://owl.example.org',
         RATE_LIMIT_MULTIPLIER: '1000',
       }),
@@ -747,8 +750,13 @@ describe('the ceiling on the size of the database', () => {
     t = undefined;
   });
 
-  const create = (app: TestApp['app']) =>
-    app.inject({ method: 'POST', url: '/api/events', payload: eventBody() });
+  const create = async (app: TestApp['app']) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/events',
+      headers: await creationHeaders(app),
+      payload: eventBody(),
+    });
 
   it('takes events without a ceiling', async () => {
     t = await testApp();

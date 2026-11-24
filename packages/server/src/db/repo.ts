@@ -2,8 +2,8 @@ import {
   addDays,
   blockFits,
   utcDateOf,
-  expiresOn,
-  todayUTC,
+  EventTheme,
+  type EventThemeData,
   type EmojiKey,
   type EventStatusData,
   type EventSnapshotData,
@@ -34,7 +34,7 @@ export interface EventRow {
   final_end: string | null;
   created_at: number;
   last_write_at: number;
-  expires_on: string;
+  theme: string | null;
   version: number;
 }
 
@@ -237,7 +237,9 @@ export function buildSnapshot(db: Db, event: EventRow): EventSnapshotData {
       status: statusOf(event),
       finalStart: event.final_start,
       finalEnd: event.final_end,
-      expiresOn: event.expires_on,
+      ...(event.theme !== null && {
+        theme: EventTheme.parse(JSON.parse(event.theme)),
+      }),
       version: event.version,
       days: days.map((day) => day.day),
     },
@@ -247,37 +249,13 @@ export function buildSnapshot(db: Db, event: EventRow): EventSnapshotData {
   };
 }
 
-/**
- * Record a change: the version moves on, and the event's life is measured
- * from today again. Every write calls this inside its transaction; no read
- * ever does.
- */
+/** Keep live updates and the last change time in step. */
 function touch(db: Db, eventId: string, now: number): number {
-  const event = getEvent(db, eventId)!;
-  const lastDay = db.get<{ day: string }>(
-    'SELECT max(day) AS day FROM event_days WHERE event_id = ?',
-    eventId
-  )!.day;
-  const answered =
-    db.get(
-      'SELECT 1 FROM participants WHERE event_id = ? AND marks_at IS NOT NULL LIMIT 1',
-      eventId
-    ) !== undefined;
-  const expires = expiresOn({
-    lastWriteDay: todayUTC(new Date(now)),
-    lastCandidateDay: lastDay,
-    finalEnd: event.final_end,
-    answered,
-  });
-  // Nothing reads last_write_at (expires_on carries the retention date), but
-  // the column is NOT NULL and an applied migration is never edited: it stays.
-  db.run(
-    'UPDATE events SET version = version + 1, last_write_at = ?, expires_on = ? WHERE id = ?',
+  return db.get<{ version: number }>(
+    'UPDATE events SET version = version + 1, last_write_at = ? WHERE id = ? RETURNING version',
     now,
-    expires,
     eventId
-  );
-  return event.version + 1;
+  )!.version;
 }
 
 export interface NewEvent {
@@ -287,6 +265,7 @@ export interface NewEvent {
   description: string | null;
   location: string | null;
   emoji: EmojiKey;
+  theme?: EventThemeData | undefined;
   creatorName: string | null;
   language: Language;
   durationDays: number;
@@ -303,18 +282,11 @@ export interface NewParticipant {
 
 export function insertEvent(db: Db, event: NewEvent, now: number): void {
   db.tx(() => {
-    const expires = expiresOn({
-      lastWriteDay: todayUTC(new Date(now)),
-      lastCandidateDay: event.days[event.days.length - 1]!,
-      finalEnd: null,
-      // Names on the roster have not answered.
-      answered: false,
-    });
     db.run(
       `INSERT INTO events (id, admin_hash, title, description, location, emoji,
         creator_name, language, duration_days, min_count, created_at,
-        last_write_at, expires_on)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        last_write_at, expires_on, theme)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '9999-12-31', ?)`,
       event.id,
       event.adminHash,
       event.title,
@@ -327,7 +299,7 @@ export function insertEvent(db: Db, event: NewEvent, now: number): void {
       event.minCount,
       now,
       now,
-      expires
+      event.theme === undefined ? null : JSON.stringify(event.theme)
     );
     for (const day of event.days) {
       db.run(
@@ -763,31 +735,6 @@ export function deleteEvent(db: Db, eventId: string): boolean {
  * that lock (the command line against a running server) can run out of patience.
  */
 const DELETE_CHUNK = 200;
-
-/**
- * Delete every event whose last day has passed (`expires_on < today`: on the
- * last day itself it still exists); return their ids.
- */
-export function sweepExpired(db: Db, today: ISODate): string[] {
-  const deleted: string[] = [];
-  for (;;) {
-    // Looked up again for every chunk: an event that was extended in between
-    // is no longer expired.
-    const ids = db.tx(() => {
-      const chunk = db
-        .all<{ id: string }>(
-          'SELECT id FROM events WHERE expires_on < ? LIMIT ?',
-          today,
-          DELETE_CHUNK
-        )
-        .map((row) => row.id);
-      for (const id of chunk) db.run('DELETE FROM events WHERE id = ?', id);
-      return chunk;
-    });
-    deleted.push(...ids);
-    if (ids.length < DELETE_CHUNK) return deleted;
-  }
-}
 
 export interface EventListing {
   id: string;

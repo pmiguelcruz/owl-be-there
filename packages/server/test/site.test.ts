@@ -8,14 +8,9 @@ import {
   APP_NAME,
   emojiIcon,
   escapeMarkup,
-  FAQ_TOPICS,
-  FEATURES,
   LANGUAGES,
-  RETENTION_DAYS,
-  persianNumber,
   SERVER_TEXTS,
 } from '@owl/shared';
-import { HOME_TEXTS } from '@owl/shared/home-texts';
 import { snapshot } from '../src/db/repo.js';
 import {
   dataBlock,
@@ -28,6 +23,7 @@ import { PreviewRenderer } from '../src/preview.js';
 import {
   CLIENT_DIR,
   createEvent,
+  creationHeaders,
   eventBody,
   join,
   mark,
@@ -88,9 +84,20 @@ describe('security headers', () => {
 });
 
 describe('pages', () => {
-  it('serves the app with the default head on / and /privacy', async () => {
+  it('redirects old privacy links and serves the admin shell without caching', async () => {
     t = await testApp();
-    for (const url of ['/', '/privacy']) {
+    const privacy = await t.app.inject('/privacy');
+    expect(privacy.statusCode).toBe(308);
+    expect(privacy.headers.location).toBe('/about');
+    const admin = await t.app.inject('/admin/');
+    expect(admin.statusCode).toBe(200);
+    expect(admin.headers['cache-control']).toBe('no-store');
+    expect(admin.headers['x-robots-tag']).toBe('noindex, nofollow');
+  });
+
+  it('serves the app with the default head on / and /about', async () => {
+    t = await testApp();
+    for (const url of ['/', '/about']) {
       const response = await t.app.inject({ method: 'GET', url });
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toBe('text/html; charset=utf-8');
@@ -404,46 +411,21 @@ describe('pages', () => {
       '<link rel="canonical" href="https://owl.example.org/" />'
     );
     // Only the start page has language versions.
-    const privacy = await t.app.inject({ method: 'GET', url: '/privacy' });
+    const privacy = await t.app.inject({ method: 'GET', url: '/about' });
     expect(privacy.body).not.toContain('hreflang');
   });
 
-  it('writes the start page text into the HTML of every language version, for readers without scripts', async () => {
+  it('keeps saved events browser-local and serves an empty home root', async () => {
     t = await testApp();
-    for (const [url, language] of [
-      ['/', 'en'],
-      ...LANGUAGES.map((language) => [`/${language}`, language] as const),
-    ] as const) {
+    for (const url of ['/', ...LANGUAGES.map((language) => `/${language}`)]) {
       const { body } = await t.app.inject({ method: 'GET', url });
-      const texts = HOME_TEXTS[language];
-      const root = body.slice(
-        body.indexOf('<div id="root">'),
-        body.indexOf('</body>')
-      );
-      expect(root, url).toContain('<div data-static>');
-      expect(root, url).toContain(
-        `<h1>${escapeMarkup(SERVER_TEXTS[language].tagline)}</h1>`
-      );
-      expect(root, url).toContain(`<p>${escapeMarkup(texts['home.lead'])}</p>`);
-      for (const feature of FEATURES) {
-        expect(root, `${url} ${feature}`).toContain(
-          `<h2>${escapeMarkup(texts[`home.feature.${feature}.title`])}</h2>` +
-            `<p>${escapeMarkup(texts[`home.feature.${feature}.text`])}</p>`
-        );
-      }
-      for (const topic of FAQ_TOPICS) {
-        expect(root, `${url} ${topic}`).toContain(
-          `<h3>${escapeMarkup(texts[`home.faq.${topic}.q`])}</h3>`
-        );
-        expect(root, `${url} ${topic}`).toContain(
-          `<p>${escapeMarkup(texts[`home.faq.${topic}.a`])}</p>`
-        );
-      }
+      expect(body, url).toContain('<div id="root"></div>');
       expect(body, url).not.toContain('<!--owl:root-->');
+      expect(body, url).not.toContain('FAQPage');
     }
   });
 
-  it('describes the start page to search engines as a free web app with its questions, in its language', async () => {
+  it('describes the start page to search engines as a free web app in its language', async () => {
     t = await testApp();
     for (const [url, language] of [
       ['/', 'en'],
@@ -466,44 +448,7 @@ describe('pages', () => {
         isAccessibleForFree: true,
         description: SERVER_TEXTS[language].description,
       });
-      expect(graph[1]['@type'], url).toBe('FAQPage');
-      expect(graph[1].mainEntity, url).toEqual(
-        FAQ_TOPICS.map((topic) => ({
-          '@type': 'Question',
-          name: HOME_TEXTS[language][`home.faq.${topic}.q`],
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: HOME_TEXTS[language][`home.faq.${topic}.a`],
-          },
-        }))
-      );
-    }
-  });
-
-  it('states the retention period in the privacy answer of the structured data and of the written text', async () => {
-    t = await testApp();
-    for (const language of LANGUAGES) {
-      const { body } = await t.app.inject({
-        method: 'GET',
-        url: `/${language}`,
-      });
-      const ld = body.match(
-        /<script type="application\/ld\+json">([\s\S]*?)<\/script>/
-      );
-      const answers: { name: string; acceptedAnswer: { text: string } }[] =
-        JSON.parse(ld![1]!)['@graph'][1].mainEntity;
-      const privacy = answers.find(
-        (entry) => entry.name === HOME_TEXTS[language]['home.faq.privacy.q']
-      );
-      const days =
-        language === 'fa'
-          ? persianNumber.format(RETENTION_DAYS)
-          : String(RETENTION_DAYS);
-      expect(privacy?.acceptedAnswer.text, language).toContain(days);
-      expect(body, language).toContain(
-        `<p>${escapeMarkup(HOME_TEXTS[language]['home.faq.privacy.a'])}</p>`
-      );
-      expect(HOME_TEXTS[language]['home.faq.privacy.a']).toContain(days);
+      expect(graph, url).toHaveLength(1);
     }
   });
 
@@ -511,7 +456,7 @@ describe('pages', () => {
     t = await testApp();
     const { id } = await createEvent(t.app, { title: 'Quiet page' });
     const tag = `<meta property="og:site_name" content="${escapeMarkup(APP_NAME)}" />`;
-    for (const url of ['/', '/de', '/privacy', `/e/${id}`, '/nowhere']) {
+    for (const url of ['/', '/de', '/about', `/e/${id}`, '/nowhere']) {
       const { body } = await t.app.inject({ method: 'GET', url });
       expect(body, url).toContain(tag);
       expect(body.match(/og:site_name/g), url).toHaveLength(1);
@@ -521,7 +466,7 @@ describe('pages', () => {
   it('keeps the start page text and the structured data off every other page', async () => {
     t = await testApp({ env: IMPRINT_ENV });
     const { id } = await createEvent(t.app, { title: 'Quiet page' });
-    for (const url of [`/e/${id}`, '/privacy', '/imprint', '/nowhere']) {
+    for (const url of [`/e/${id}`, '/about', '/imprint', '/nowhere']) {
       const { body } = await t.app.inject({ method: 'GET', url });
       expect(body, url).toContain('<div id="root"></div>');
       expect(body, url).not.toContain('data-static');
@@ -624,7 +569,7 @@ describe('pages', () => {
 
   it('answers a language it does not speak, or a capitalised one, with a 404', async () => {
     t = await testApp();
-    for (const url of ['/xx', '/no', '/DE', '/de/privacy']) {
+    for (const url of ['/xx', '/no', '/DE', '/de/about']) {
       const response = await t.app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBe(404);
       expect(response.body, url).toContain('<html lang="en">');
@@ -657,7 +602,7 @@ describe('pages', () => {
     expect(locs).toEqual([
       'https://owl.example.org/',
       ...LANGUAGES.map((language) => `https://owl.example.org/${language}`),
-      'https://owl.example.org/privacy',
+      'https://owl.example.org/about',
     ]);
     expect(response.body).not.toContain('/imprint');
     expect(response.body).not.toContain(id);
@@ -675,7 +620,7 @@ describe('pages', () => {
       (match) => match[1]
     );
     expect(locs.slice(-2)).toEqual([
-      'https://owl.example.org/privacy',
+      'https://owl.example.org/about',
       'https://owl.example.org/imprint',
     ]);
   });
@@ -714,7 +659,7 @@ describe('pages', () => {
       [`/e/${id}/`, `/e/${id}`],
       ['/de/', '/de'],
       ['/ja/', '/ja'],
-      ['/privacy/', '/privacy'],
+      ['/about/', '/about'],
     ] as const) {
       for (const method of ['GET', 'HEAD'] as const) {
         const slash = await t!.app.inject({ method, url });
@@ -760,13 +705,13 @@ describe('pages', () => {
         '//',
         `/e//${ID}`,
         '/de//',
-        '/privacy//',
+        '/about//',
         '/.env',
         '/.hidden',
         '/.well-known/security.txt',
         '/a%00b',
         `/${'a'.repeat(256)}`,
-        `/privacy/${'a'.repeat(300)}`,
+        `/about/${'a'.repeat(300)}`,
       ]) {
         for (const method of ['GET', 'HEAD'] as const) {
           const response = await t.app.inject({ method, url });
@@ -1240,7 +1185,6 @@ describe('requests', () => {
     const info = await t.app.inject({ method: 'GET', url: '/api/instance' });
     expect(info.json()).toMatchObject({
       creationEnabled: true,
-      retentionDays: 90,
       logRetentionDays: 7,
       backupRetentionDays: null,
       operatorName: 'Example Org',
@@ -1297,12 +1241,16 @@ describe('rate limits', () => {
 
   it('cap new events per hour per address', async () => {
     t = await testApp({ env: { RATE_LIMIT_MULTIPLIER: '1' } });
-    for (let i = 0; i < 10; i += 1) await createEvent(t.app);
-    const response = await t.app.inject({
-      method: 'POST',
-      url: '/api/events',
-      payload: eventBody(),
-    });
+    const headers = await creationHeaders(t.app);
+    const post = () =>
+      t!.app.inject({
+        method: 'POST',
+        url: '/api/events',
+        headers,
+        payload: eventBody(),
+      });
+    for (let i = 0; i < 10; i += 1) expect((await post()).statusCode).toBe(201);
+    const response = await post();
     expect(response.statusCode).toBe(429);
     expect(response.json().error).toBe('creation_limit');
   });
@@ -1311,11 +1259,13 @@ describe('rate limits', () => {
     t = await testApp({ env: { RATE_LIMIT_MULTIPLIER: '1' } });
     // 30 networks of 10 events fill the ceiling of 300; each stays within
     // its own limit.
+    const headers = await creationHeaders(t.app);
     for (let n = 1; n <= 30; n += 1) {
       for (let i = 0; i < 10; i += 1) {
         const response = await t.app.inject({
           method: 'POST',
           url: '/api/events',
+          headers,
           payload: eventBody(),
           remoteAddress: `203.0.113.${n}`,
         });
@@ -1326,6 +1276,7 @@ describe('rate limits', () => {
       method: 'POST',
       url: '/api/events',
       payload: eventBody(),
+      headers,
       remoteAddress: '203.0.113.200',
     });
     expect(refused.statusCode).toBe(429);
@@ -1438,7 +1389,7 @@ describe('dictionary chunks from the build manifest', () => {
         env: { CLIENT_DIR: clientWith(JSON.stringify(MANIFEST)) },
       });
       const { id } = await createEvent(t.app);
-      for (const url of ['/', '/fa', `/e/${id}`, '/privacy', '/no-such-page']) {
+      for (const url of ['/', '/fa', `/e/${id}`, '/about', '/no-such-page']) {
         const body = (await t.app.inject({ method: 'GET', url })).body;
         const start = body.indexOf(BLOCK);
         expect(start, url).toBeGreaterThan(-1);

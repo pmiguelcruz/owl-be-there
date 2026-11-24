@@ -4,7 +4,6 @@ import {
   useId,
   useRef,
   type ButtonHTMLAttributes,
-  type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
@@ -119,7 +118,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
 const inputClass =
   'w-full rounded-2xl border-2 border-line bg-surface px-4 py-2.5 text-ink placeholder:text-muted focus:border-focus aria-[invalid=true]:border-danger';
 
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput(props: ComponentProps<'input'>) {
   return (
     <input
       {...props}

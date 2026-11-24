@@ -93,10 +93,10 @@ describe('mailtoHref', () => {
 });
 
 describe('the imprint route', () => {
-  it('is /imprint, with or without a slash, and the privacy page likewise', () => {
+  it('is /imprint, with or without a slash, and recognizes the old privacy path as About', () => {
     expect(parseRoute('/imprint')).toEqual({ page: 'imprint' });
     expect(parseRoute('/imprint/')).toEqual({ page: 'imprint' });
-    expect(parseRoute('/privacy/')).toEqual({ page: 'privacy' });
+    expect(parseRoute('/privacy/')).toEqual({ page: 'about' });
     for (const bad of ['/imprint//', '/imprints', '/Imprint', '/de/imprint']) {
       expect(parseRoute(bad), bad).toEqual({ page: 'not-found' });
     }

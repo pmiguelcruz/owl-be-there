@@ -1,5 +1,7 @@
 import {
   ADMIN_HEADER,
+  AdminUnlockResponse,
+  CREATION_HEADER,
   ApiErrorBody,
   CreateEventResponse,
   EventSnapshot,
@@ -170,8 +172,17 @@ export const api = {
     return request('GET', '/api/instance', InstanceInfo);
   },
 
-  createEvent(body: CreateEventInput) {
-    return request('POST', '/api/events', CreateEventResponse, { body });
+  unlockAdmin(pin: string) {
+    return request('POST', '/api/admin/unlock', AdminUnlockResponse, {
+      body: { pin },
+    });
+  },
+
+  createEvent(body: CreateEventInput, token: string) {
+    return request('POST', '/api/events', CreateEventResponse, {
+      body,
+      headers: { [CREATION_HEADER]: token },
+    });
   },
 
   /**

@@ -3,6 +3,7 @@ import { LIMITS, snapshotEtag } from '@owl/shared';
 import { getEvent } from '../src/db/repo.js';
 import {
   createEvent,
+  creationHeaders,
   eventBody,
   getSnapshot,
   join,
@@ -45,7 +46,6 @@ describe('creating an event', () => {
       status: 'open',
       days: ['2027-03-05', ...WEEKEND],
       version: 1,
-      expiresOn: '2027-05-30',
     });
     // The roster is deduplicated by name key, and nobody on it has answered.
     expect(participants.map((p: { name: string }) => p.name)).toEqual([
@@ -79,10 +79,11 @@ describe('creating an event', () => {
   });
 
   it('refuses days in the past, beyond the span, or too many', async () => {
-    const post = (days: string[]) =>
+    const post = async (days: string[]) =>
       t.app.inject({
         method: 'POST',
         url: '/api/events',
+        headers: await creationHeaders(t.app),
         payload: eventBody({ days }),
       });
     const past = await post(['2027-02-27']);
@@ -102,6 +103,7 @@ describe('creating an event', () => {
     const response = await t.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(t.app),
       payload: eventBody({
         days: ['2027-03-05', '2027-03-07'],
         durationDays: 2,
@@ -115,6 +117,7 @@ describe('creating an event', () => {
     const response = await t.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(t.app),
       payload: { title: 'x' },
     });
     expect(response.statusCode).toBe(400);
@@ -138,6 +141,7 @@ describe('creating an event', () => {
     const full = await small.app.inject({
       method: 'POST',
       url: '/api/events',
+      headers: await creationHeaders(small.app),
       payload: eventBody(),
     });
     expect(full.statusCode).toBe(503);
@@ -231,7 +235,7 @@ describe('reading an event', () => {
     }
   );
 
-  it('never extends an event by reading it', async () => {
+  it('does not change the last write time on reads', async () => {
     const { id } = await createEvent(t.app);
     const before = getEvent(t.db, id)!;
     t.clock.advanceDays(30);
@@ -239,7 +243,6 @@ describe('reading an event', () => {
     await t.app.inject({ method: 'GET', url: `/e/${id}` });
     const after = getEvent(t.db, id)!;
     expect(after.last_write_at).toBe(before.last_write_at);
-    expect(after.expires_on).toBe(before.expires_on);
   });
 });
 
@@ -275,7 +278,7 @@ describe('the organiser', () => {
     }
   });
 
-  it('leaves version and retention alone when a PATCH changes nothing', async () => {
+  it('leaves version and the last write time alone when a PATCH changes nothing', async () => {
     const { id, adminToken } = await createEvent(t.app, { title: 'Same' });
     const before = getEvent(t.db, id)!;
     t.clock.advanceDays(30);
@@ -294,14 +297,12 @@ describe('the organiser', () => {
       const after = getEvent(t.db, id)!;
       expect(after.version).toBe(before.version);
       expect(after.last_write_at).toBe(before.last_write_at);
-      expect(after.expires_on).toBe(before.expires_on);
     }
     expect(
       (await patchEvent(t.app, id, adminToken, { title: 'Other' })).statusCode
     ).toBe(200);
     const changed = getEvent(t.db, id)!;
     expect(changed.version).toBe(before.version + 1);
-    expect(changed.expires_on).not.toBe(before.expires_on);
   });
 
   it('edits the details and clears optional ones', async () => {

@@ -2,7 +2,6 @@ import {
   APP_NAME,
   EMOJIS,
   emojiIcon,
-  formatDay,
   formatDayRange,
   googleCalendarUrl,
   type EventSnapshotData,
@@ -27,10 +26,9 @@ import {
   UsersIcon,
 } from '../components/icons.tsx';
 import { MyDays } from '../components/MyDays.tsx';
-import { Owl } from '../components/Owl.tsx';
+import { EventWallpaper } from '../components/EventWallpaper.tsx';
 import { ShareDialog } from '../components/ShareDialog.tsx';
-import { Link } from '../App.tsx';
-import { Button, buttonClass, Card, Notice } from '../components/ui.tsx';
+import { Button, Notice } from '../components/ui.tsx';
 import { useI18n } from '../i18n/index.tsx';
 import { api, calendarFileUrl } from '../lib/api.ts';
 import { OWL_ICON, setFavicon } from '../lib/favicon.ts';
@@ -42,7 +40,6 @@ import type { EventStore } from '../lib/eventStore.ts';
 import { firstWeekdayFor } from '../lib/locale.ts';
 import { eventLink } from '../lib/links.ts';
 import { takeAdminTokenFromFragment } from '../lib/adminKey.ts';
-import { deletionDay } from '../lib/retentionText.ts';
 import {
   clearAdminToken,
   forgetEvent,
@@ -175,7 +172,11 @@ export function EventPage({
       rememberEvent(loaded, adminToken ? 'organiser' : 'participant');
       // The emoji is the tab's icon; in the title it would show twice.
       document.title = `${loaded.title} · ${APP_NAME}`;
-      setFavicon(emojiIcon(EMOJIS[loaded.emoji]));
+      setFavicon(
+        loaded.theme || loaded.emoji === 'owl'
+          ? OWL_ICON
+          : emojiIcon(EMOJIS[loaded.emoji])
+      );
     } else {
       // Not the title of the page this one replaced.
       document.title = `${APP_NAME} — ${t('app.tagline')}`;
@@ -195,7 +196,6 @@ export function EventPage({
   if (state.status === 'loading') {
     return (
       <div className="flex flex-col items-center gap-4 py-20" role="status">
-        <Owl mood="thinking" size={120} bob />
         <p className="font-bold text-muted">{t('event.loading')}</p>
       </div>
     );
@@ -256,7 +256,6 @@ function EndState({ status }: { status: 'not-found' | 'deleted' | 'error' }) {
   }, [status]);
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
-      <Owl mood={status === 'error' ? 'confused' : 'sleeping'} size={150} />
       <h1 ref={heading} tabIndex={-1} className="text-3xl font-black">
         {status === 'deleted'
           ? t('event.deleted')
@@ -273,19 +272,13 @@ function EndState({ status }: { status: 'not-found' | 'deleted' | 'error' }) {
 
 function EventView(props: EventViewProps) {
   const { data, stale, store, adminToken, session, onSession } = props;
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [tab, setTab] = useState<EventTab>('mine');
   const [editingFor, setEditingFor] = useState<string | null>(null);
   const firstWeekday = useMemo(() => firstWeekdayFor(navigator.language), []);
   const today = useToday();
   const { event } = data;
   const answered = data.participants.filter((p) => p.answered).length;
-  // Once someone has answered, a quiet word that they can plan their own.
-  const me = session
-    ? data.participants.find((p) => p.id === session.participantId)
-    : undefined;
-  const invitePlanning = !adminToken && me?.answered === true;
-
   const shared = {
     data,
     store,
@@ -307,6 +300,12 @@ function EventView(props: EventViewProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {event.theme && (
+        <EventWallpaper
+          {...event.theme}
+          className="pointer-events-none fixed inset-0 -z-10 opacity-25"
+        />
+      )}
       <EventHeader data={data} onShare={() => props.onShare(true)} />
       {stale && <Notice>{t('event.stale')}</Notice>}
       {props.adminRefused && (
@@ -344,28 +343,6 @@ function EventView(props: EventViewProps) {
           }}
         />
       )}
-
-      {invitePlanning && (
-        <Card className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <p className="font-extrabold">{t('event.planOwn.title')}</p>
-            <p className="text-sm text-muted">{t('event.planOwn.text')}</p>
-          </div>
-          <Link href="/" className={buttonClass('primary', 'md')}>
-            {t('home.cta')}
-          </Link>
-        </Card>
-      )}
-
-      <p className="text-center text-sm text-muted">
-        {t('event.expires', {
-          date: formatDay(deletionDay(event.expiresOn), locale, {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          }),
-        })}
-      </p>
 
       <ShareDialog
         open={props.shareOpen}
@@ -411,7 +388,9 @@ function EventHeader({
     <header className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <h1 className="flex max-w-full min-w-0 flex-auto items-start gap-3 text-3xl leading-tight font-black sm:text-4xl">
-          <span aria-hidden="true">{EMOJIS[event.emoji]}</span>
+          {!event.theme && event.emoji !== 'owl' && (
+            <span aria-hidden="true">{EMOJIS[event.emoji]}</span>
+          )}
           <span dir="auto" className="min-w-0 break-words">
             {event.title}
           </span>
@@ -475,7 +454,6 @@ function StatusBanner({
   });
   return (
     <section className="flex flex-col items-center gap-4 rounded-3xl border-2 border-brand bg-brand-soft p-5 text-center sm:flex-row sm:text-start">
-      <Owl mood="celebrating" size={96} />
       <div className="flex flex-1 flex-col gap-1">
         <p className="text-base font-black text-muted">{t('event.decided')}</p>
         <p className="text-2xl font-black">{when}</p>

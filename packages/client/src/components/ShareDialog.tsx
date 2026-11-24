@@ -2,7 +2,6 @@ import { EMOJIS, type EventViewData } from '@owl/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n/index.tsx';
 import { CopyIcon, ShareIcon } from './icons.tsx';
-import { Owl } from './Owl.tsx';
 import { Button, Dialog, Notice } from './ui.tsx';
 import { isolateIfRtl } from '../lib/bidi.ts';
 import { eventLink } from '../lib/links.ts';
@@ -112,17 +111,16 @@ export function ShareDialog({
   const { t } = useI18n();
   const url = eventLink(publicUrl, event.id, window.location.origin);
   const invitation = t('share.inviteText', {
-    emoji: EMOJIS[event.emoji],
+    emoji: event.theme || event.emoji === 'owl' ? '' : EMOJIS[event.emoji],
     title: isolateIfRtl(event.title),
     url,
-  });
+  }).trimStart();
   const canShare = typeof navigator.share === 'function';
   return (
     <Dialog open={open} onClose={onClose} title={t('share.title')}>
       <div className="flex flex-col gap-5">
         {justCreated && (
           <div className="flex items-center gap-3">
-            <Owl mood="celebrating" size={72} />
             <p className="font-extrabold">{t('share.created')}</p>
           </div>
         )}

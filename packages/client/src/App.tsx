@@ -1,14 +1,7 @@
-import {
-  APP_NAME,
-  hasImprint,
-  isLanguage,
-  LANGUAGE_NAMES,
-  languagesByName,
-  type InstanceInfoData,
-} from '@owl/shared';
+import { APP_NAME, hasImprint, LANGUAGE_NAMES } from '@owl/shared';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Owl } from './components/Owl.tsx';
-import { Notice, Select } from './components/ui.tsx';
+import { buttonClass, Notice } from './components/ui.tsx';
 import { I18nProvider, useI18n } from './i18n/index.tsx';
 import type { LanguageStore } from './lib/languageStore.ts';
 import { api } from './lib/api.ts';
@@ -18,21 +11,14 @@ import {
   type InstanceState,
 } from './lib/instanceStore.ts';
 import { OWL_ICON, setFavicon } from './lib/favicon.ts';
-import { readTheme, writeTheme, type ThemeChoice } from './lib/prefs.ts';
 import { usePathname } from './hooks/usePathname.ts';
-import { imprintLink } from './lib/imprint.ts';
-import {
-  headingKey,
-  navigate,
-  parseRoute,
-  placeOf,
-  type Route,
-} from './lib/route.ts';
+import { headingKey, navigate, parseRoute, placeOf } from './lib/route.ts';
+import { AdminPage } from './pages/AdminPage.tsx';
+import { AboutPage } from './pages/AboutPage.tsx';
 import { EventPage } from './pages/EventPage.tsx';
 import { HomePage } from './pages/HomePage.tsx';
 import { NotFoundPage } from './pages/NotFoundPage.tsx';
 import { ImprintPage } from './pages/ImprintPage.tsx';
-import { PrivacyPage } from './pages/PrivacyPage.tsx';
 
 export function App({ languages }: { languages: LanguageStore }) {
   return (
@@ -67,6 +53,7 @@ function Shell() {
   const route = parseRoute(usePathname());
   const instanceState = useInstance();
   const instance = instanceState.info;
+  const [adminSession, setAdminSession] = useState<string | null>(null);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
   // `/fr` reached by the back button or a link: the page follows the address,
@@ -109,7 +96,7 @@ function Shell() {
   let page: ReactNode;
   switch (route.page) {
     case 'home':
-      page = <HomePage instance={instance} />;
+      page = <HomePage />;
       break;
     case 'event':
       page = (
@@ -120,8 +107,11 @@ function Shell() {
         />
       );
       break;
-    case 'privacy':
-      page = <PrivacyPage instance={instanceState} />;
+    case 'about':
+      page = <AboutPage />;
+      break;
+    case 'admin':
+      page = <AdminPage session={adminSession} setSession={setAdminSession} />;
       break;
     case 'imprint':
       page = <ImprintPage instance={instanceState} />;
@@ -131,14 +121,14 @@ function Shell() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="isolate flex min-h-dvh flex-col">
       <Header />
       <main
         ref={mainRef}
         tabIndex={-1}
         className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 pb-12 outline-none! sm:px-6"
       >
-        {loadFailed && (
+        {route.page !== 'home' && loadFailed && (
           <div className="mb-4">
             <Notice tone="error">
               {t('language.loadFailed', {
@@ -150,7 +140,6 @@ function Shell() {
         )}
         {page}
       </main>
-      <Footer instance={instance} route={route} />
     </div>
   );
 }
@@ -188,117 +177,29 @@ export function Link({
 }
 
 function Header() {
+  const { t } = useI18n();
   return (
-    <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 pt-3 sm:px-6">
+    <header
+      dir="ltr"
+      className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-4 pt-3 sm:px-6"
+    >
       <Link
         href="/"
-        className="flex items-center gap-2 rounded-full pe-3 font-black"
+        className="flex min-w-0 items-center gap-2 rounded-full font-black"
       >
         <Owl size={40} />
-        <span className="text-xl tracking-tight">{APP_NAME}</span>
+        <span className="text-base leading-tight tracking-tight sm:text-xl">
+          {APP_NAME}
+        </span>
       </Link>
+      <nav className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <Link href="/about" className={buttonClass('secondary', 'sm')}>
+          {t('about.title')}
+        </Link>
+        <Link href="/admin" className={buttonClass('secondary', 'sm')}>
+          {t('siteAdmin.title')}
+        </Link>
+      </nav>
     </header>
-  );
-}
-
-function Footer({
-  instance,
-  route,
-}: {
-  instance: InstanceInfoData | null;
-  route: Route;
-}) {
-  const { t, choice, setLanguage } = useI18n();
-  const imprint = imprintLink(instance);
-  const [theme, setTheme] = useState<ThemeChoice>(readTheme);
-  const choose = (next: ThemeChoice) => {
-    setTheme(next);
-    writeTheme(next);
-  };
-  const selectClass =
-    'min-h-10 rounded-full border-2 border-line bg-surface ps-3 font-bold text-ink focus:border-focus';
-  return (
-    <footer className="border-t border-line bg-sunken/60">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm sm:px-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2">
-            <span className="font-bold">{t('footer.language')}</span>
-            <Select
-              className={selectClass}
-              // The choice, not the shown language: a controlled select would
-              // jump back while the new language's texts load.
-              value={choice}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (!isLanguage(next)) return;
-                setLanguage(next);
-                // On `/de`, choosing French moves to `/fr` rather than
-                // leaving a German address with a French page.
-                if (route.page === 'home' && route.language)
-                  navigate(`/${next}`, { replace: true, keepScroll: true });
-              }}
-            >
-              {languagesByName().map((code) => (
-                <option key={code} value={code} lang={code}>
-                  {LANGUAGE_NAMES[code]}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="flex items-center gap-2">
-            <span className="font-bold">{t('footer.theme')}</span>
-            <Select
-              className={selectClass}
-              value={theme}
-              onChange={(event) => choose(event.target.value as ThemeChoice)}
-            >
-              <option value="system">{t('theme.system')}</option>
-              <option value="light">{t('theme.light')}</option>
-              <option value="dark">{t('theme.dark')}</option>
-            </Select>
-          </label>
-        </div>
-        <nav className="flex flex-wrap items-center gap-4 font-bold">
-          {route.page !== 'home' && (
-            <Link
-              href="/"
-              className="inline-flex min-h-6 items-center underline-offset-4 hover:underline"
-            >
-              {t('home.cta')}
-            </Link>
-          )}
-          <Link
-            href="/privacy"
-            className="inline-flex min-h-6 items-center underline-offset-4 hover:underline"
-          >
-            {t('footer.privacy')}
-          </Link>
-          {imprint?.kind === 'internal' && (
-            <Link
-              href={imprint.href}
-              className="inline-flex min-h-6 items-center underline-offset-4 hover:underline"
-            >
-              {t('footer.imprint')}
-            </Link>
-          )}
-          {imprint?.kind === 'external' && (
-            <a
-              href={imprint.href}
-              rel="noopener noreferrer"
-              className="inline-flex min-h-6 items-center underline-offset-4 hover:underline"
-            >
-              {t('footer.imprint')}
-            </a>
-          )}
-          <a
-            href="https://github.com/ni-c/owl-be-there"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-6 items-center underline-offset-4 hover:underline"
-          >
-            {t('footer.source')}
-          </a>
-        </nav>
-      </div>
-    </footer>
   );
 }

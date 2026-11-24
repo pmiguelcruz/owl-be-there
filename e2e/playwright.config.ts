@@ -55,6 +55,7 @@ export default defineConfig({
       // Playwright merges this over the caller's whole environment, so every
       // other setting the server reads is pinned: a blank value counts as unset.
       CREATION_ENABLED: 'true',
+      ADMIN_PIN: '4182',
       MAX_EVENTS: '10000',
       OWL_SECRET: '',
       TRUST_PROXY: '',

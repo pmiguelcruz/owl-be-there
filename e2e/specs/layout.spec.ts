@@ -125,8 +125,8 @@ for (const language of LANGUAGES) {
 }
 
 // A finger needs 24 by 24 CSS pixels (WCAG 2.5.8): the calendar's week
-// buttons, the footer links and the checkbox of the name form.
-test('week buttons, footer links and the password checkbox are 24 pixels on a phone', async ({
+// buttons, the header links and the checkbox of the name form.
+test('week buttons, header links and the password checkbox are 24 pixels on a phone', async ({
   page,
   request,
 }, testInfo) => {
@@ -148,7 +148,7 @@ test('week buttons, footer links and the password checkbox are 24 pixels on a ph
   const [count, small] = await page.evaluate(() => {
     const targets = [
       ...document.querySelectorAll('[role="grid"] .cal-rowhead button'),
-      ...document.querySelectorAll('footer nav a'),
+      ...document.querySelectorAll('header nav a'),
     ];
     const tooSmall = targets
       .map((target) => ({

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { isId, isValidISODate, todayUTC } from '@owl/shared';
+import { isId, isValidISODate } from '@owl/shared';
 import { ConfigError, loadConfig } from './config.js';
 import { MigrationError, pendingMigrations } from './db/migrations.js';
 import {
@@ -9,7 +9,6 @@ import {
   listEvents,
   purgeEmpty,
   stats,
-  sweepExpired,
   weeklyStats,
 } from './db/repo.js';
 import { Db } from './db/sqlite.js';
@@ -21,7 +20,6 @@ import { Db } from './db/sqlite.js';
  *     node packages/server/dist/cli.js stats
  *     node packages/server/dist/cli.js weeks
  *     node packages/server/dist/cli.js delete <event id>
- *     node packages/server/dist/cli.js sweep
  *     node packages/server/dist/cli.js list [<YYYY-MM-DD>]
  *     node packages/server/dist/cli.js purge <YYYY-MM-DD> [--yes]
  *
@@ -46,9 +44,9 @@ import { Db } from './db/sqlite.js';
  * upgrade.
  */
 export const USAGE =
-  'Usage: cli.js stats | weeks | delete <event id> | sweep | list [<YYYY-MM-DD>] | purge <YYYY-MM-DD> [--yes]';
+  'Usage: cli.js stats | weeks | delete <event id> | list [<YYYY-MM-DD>] | purge <YYYY-MM-DD> [--yes]';
 
-const COMMANDS = ['stats', 'weeks', 'delete', 'sweep', 'list', 'purge'];
+const COMMANDS = ['stats', 'weeks', 'delete', 'list', 'purge'];
 
 /** Where the output goes; the command line's own is the console. */
 export interface Output {
@@ -138,12 +136,6 @@ export function run(
         db.checkpoint();
         io.out(deleted ? `Deleted ${argument}.` : `No event ${argument}.`);
         return deleted ? 0 : 1;
-      }
-      case 'sweep': {
-        const ids = sweepExpired(db, todayUTC());
-        db.checkpoint();
-        io.out(`Deleted ${ids.length} expired event(s).`);
-        return 0;
       }
       case 'list': {
         for (const event of listEvents(db, argument ?? null)) {

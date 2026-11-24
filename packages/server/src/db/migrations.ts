@@ -172,6 +172,10 @@ ALTER TABLE events_new RENAME TO events;
 CREATE INDEX events_expires_on ON events (expires_on);
 `,
   },
+  {
+    version: 4,
+    sql: 'ALTER TABLE events ADD COLUMN theme TEXT;',
+  },
 ];
 
 export class MigrationError extends Error {

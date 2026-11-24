@@ -195,5 +195,6 @@ export function heatOf(dayTally: Tally, respondents: number): number {
 /** The heat in six steps for the colour scale: 0 is no one, 5 is everyone. */
 export function heatLevel(heat: number): 0 | 1 | 2 | 3 | 4 | 5 {
   if (!(heat > 0)) return 0;
-  return Math.min(5, Math.max(1, Math.ceil(heat * 5))) as 1 | 2 | 3 | 4 | 5;
+  if (heat >= 1) return 5;
+  return Math.min(4, Math.ceil(heat * 5)) as 1 | 2 | 3 | 4;
 }

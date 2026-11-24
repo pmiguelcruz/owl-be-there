@@ -42,16 +42,22 @@ describe('api', () => {
     const calls = mockFetch(
       jsonResponse(201, { id: EVENT_ID, adminToken: 'a'.repeat(43) })
     );
-    const result = await api.createEvent({
-      title: 'T',
-      emoji: 'owl',
-      language: 'en',
-      durationDays: 1,
-      days: ['2027-03-06'],
-    });
+    const result = await api.createEvent(
+      {
+        title: 'T',
+        emoji: 'owl',
+        language: 'en',
+        durationDays: 1,
+        days: ['2027-03-06'],
+      },
+      'test-token'
+    );
     expect(result.id).toBe(EVENT_ID);
     expect(calls[0]!.url).toBe('/api/events');
     expect(calls[0]!.init.method).toBe('POST');
+    expect(new Headers(calls[0]!.init.headers).get('x-creation-token')).toBe(
+      'test-token'
+    );
     expect(
       (calls[0]!.init.headers as Record<string, string>)['content-type']
     ).toBe('application/json');

@@ -1,16 +1,12 @@
+import { startWizard } from '../helpers.ts';
 import { expect, test } from '@playwright/test';
 
 test('starting the wizard moves focus into it and cancelling returns it to the start button', async ({
   page,
 }) => {
-  await page.goto('/');
-  await page
-    .getByRole('button', { name: /plan|start|find/i })
-    .first()
-    .click();
-  const wizard = page.getByRole('region').filter({ has: page.locator('form') });
-  await expect(wizard).toBeFocused();
-  await wizard.getByRole('button', { name: 'Back' }).click();
+  await startWizard(page);
+  await expect(page.locator('form legend')).toBeFocused();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(
     page.getByRole('button', { name: /plan|start|find/i }).first()
   ).toBeFocused();
@@ -45,11 +41,11 @@ test('removing a list entry with one tap keeps focus in the list', async ({
   await expect(page.locator('li > a:focus')).toHaveCount(1);
 });
 
-test('the privacy title wraps instead of scrolling the page on a phone', async ({
+test('the About page fits instead of scrolling the page on a phone', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto('/ru/privacy');
+  await page.goto('/about');
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth
   );
