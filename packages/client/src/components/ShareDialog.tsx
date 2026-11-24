@@ -83,7 +83,7 @@ function QrCode({ text }: { text: string }) {
         className="rounded-2xl"
       >
         {/* A QR code needs dark on light in every theme. */}
-        <rect width={path.size} height={path.size} fill="#ffffff" />
+        <rect width={path.size} height={path.size} fill="var(--owl-ink)" />
         <path d={path.d} fill="#1b140d" />
       </svg>
       <figcaption className="text-sm font-bold text-muted">

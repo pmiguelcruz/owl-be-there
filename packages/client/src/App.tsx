@@ -2,7 +2,6 @@ import {
   APP_NAME,
   hasImprint,
   LANGUAGE_NAMES,
-  patternPalette,
   type Pattern,
 } from '@owl/shared';
 import {
@@ -10,7 +9,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { Owl } from './components/Owl.tsx';
@@ -24,6 +22,7 @@ import {
   type InstanceState,
 } from './lib/instanceStore.ts';
 import { OWL_ICON, setFavicon } from './lib/favicon.ts';
+import { wallpaperPaletteStyle } from './lib/wallpaperPalette.ts';
 import { usePathname } from './hooks/usePathname.ts';
 import { headingKey, navigate, parseRoute, placeOf } from './lib/route.ts';
 import { AdminPage } from './pages/AdminPage.tsx';
@@ -93,7 +92,7 @@ function Shell() {
     route.page === 'event' ||
     (route.page === 'admin' && Boolean(route.id && adminSession));
   const palette =
-    eventPage && eventPattern ? patternPalette(eventPattern) : null;
+    eventPage && eventPattern ? wallpaperPaletteStyle(eventPattern) : undefined;
   useEffect(() => {
     if (!eventPage) {
       document.title = heading
@@ -161,15 +160,7 @@ function Shell() {
     <div
       data-event-page={eventPage || undefined}
       data-event-palette={palette ? true : undefined}
-      style={
-        palette
-          ? ({
-              '--event-base': palette.base,
-              '--event-ink': palette.ink,
-              '--event-highlight': palette.highlight,
-            } as CSSProperties)
-          : undefined
-      }
+      style={palette}
       className="isolate flex min-h-dvh flex-col"
     >
       <Header />
@@ -235,7 +226,7 @@ function Header() {
     >
       <Link
         href="/"
-        className="flex min-w-0 items-center gap-2 rounded-full font-black"
+        className="site-wordmark flex min-w-0 items-center gap-2 rounded-full font-black"
       >
         <Owl size={40} />
         <span className="text-base leading-tight tracking-tight sm:text-xl">

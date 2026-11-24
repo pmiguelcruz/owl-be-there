@@ -57,6 +57,22 @@ describe('wallpaper recipes', () => {
     ).toBe(false);
   });
 
+  it('offers one selectable wild pattern on one outcome in five', () => {
+    for (const roll of [0, 1, 2, 3, 4]) {
+      const batch = patternBatch(() => roll);
+      const wild = batch.filter((pattern) => pattern.wild);
+      expect(batch).toHaveLength(10);
+      expect(wild).toHaveLength(roll === 0 ? 1 : 0);
+      if (wild[0]) {
+        const { kind, seed } = wild[0];
+        expect(PatternSpec.parse(wild[0])).toEqual(wild[0]);
+        expect(patternPalette(wild[0])).not.toEqual(
+          patternPalette({ kind, seed })
+        );
+      }
+    }
+  });
+
   it.each(MOTIF_PATTERN_KINDS)(
     'gives %s a spacious repeat and a much tighter repeat',
     (kind) => {
@@ -73,6 +89,12 @@ describe('wallpaper recipes', () => {
     const lights = wallpaperLight(86753);
     expect(wallpaperLight(86753)).toEqual(lights);
     expect(wallpaperLight(86754)).not.toEqual(lights);
+    const wild = wallpaperLight(86753, true);
+    expect(
+      wild
+        .map(({ opacity }) => opacity)
+        .every((opacity, index) => opacity > lights[index]!.opacity)
+    ).toBe(true);
     expect(lights.map(({ tone }) => tone)).toEqual([
       'accent',
       'thread',
@@ -83,7 +105,7 @@ describe('wallpaper recipes', () => {
       expect([x, y].every((center) => center >= 0 && center <= 1)).toBe(true);
       expect(radius).toBeGreaterThan(0.5);
       expect(squash).toBeLessThan(1);
-      expect(opacity).toBeLessThan(0.55);
+      expect(opacity).toBeLessThan(0.8);
     }
   });
 

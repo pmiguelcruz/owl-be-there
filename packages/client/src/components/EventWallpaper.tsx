@@ -12,9 +12,10 @@ export const EventWallpaper = memo(function EventWallpaper({
 }) {
   const id = useId();
   const flow = `${id}-flow`;
-  const lights = wallpaperLight(pattern.seed);
+  const lights = wallpaperLight(pattern.seed, pattern.wild);
   const { width, height, marks, palette, spacing, texture, weight } =
     drawPattern(pattern);
+  const markOpacity = pattern.wild ? 0.65 : spacing === 'packed' ? 0.31 : 0.42;
   return (
     <svg
       aria-hidden="true"
@@ -24,7 +25,8 @@ export const EventWallpaper = memo(function EventWallpaper({
       height="100%"
       data-wallpaper={preview ? 'preview' : 'event'}
       data-spacing={spacing}
-      data-pattern={`${pattern.kind}:${pattern.seed}`}
+      data-wild={pattern.wild}
+      data-pattern={`${pattern.kind}:${pattern.seed}${pattern.wild ? ':wild' : ''}`}
     >
       <defs>
         {lights.map(({ tone, x, y, radius, angle, squash, opacity }) => (
@@ -79,9 +81,9 @@ export const EventWallpaper = memo(function EventWallpaper({
           width={width}
           height={height}
           patternUnits="userSpaceOnUse"
-          patternTransform="scale(.5)"
+          patternTransform="scale(.1)"
         >
-          <g opacity={spacing === 'packed' ? '0.18' : '0.27'}>
+          <g opacity={markOpacity}>
             {marks.map(({ d, tone, fill, transform }, index) => (
               <path
                 key={index}
@@ -90,7 +92,7 @@ export const EventWallpaper = memo(function EventWallpaper({
                 fillRule="evenodd"
                 fill={fill ? palette[tone] : 'none'}
                 stroke={fill ? undefined : palette[tone]}
-                strokeWidth={fill ? undefined : weight}
+                strokeWidth={fill ? undefined : weight + 2.4}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -100,7 +102,7 @@ export const EventWallpaper = memo(function EventWallpaper({
                 d={texture}
                 fill="none"
                 stroke={palette.base}
-                strokeWidth=".65"
+                strokeWidth="1.6"
               />
             )}
           </g>

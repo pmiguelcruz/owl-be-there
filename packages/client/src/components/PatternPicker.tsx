@@ -1,6 +1,7 @@
 import { patternBatch, type Pattern } from '@owl/shared';
 import { useId } from 'react';
 import { useI18n } from '../i18n/index.tsx';
+import { wallpaperPaletteStyle } from '../lib/wallpaperPalette.ts';
 import { EventWallpaper } from './EventWallpaper.tsx';
 import { Button } from './ui.tsx';
 
@@ -10,7 +11,7 @@ export function randomPatterns(previous: readonly Pattern[] = []): Pattern[] {
 }
 
 export function samePattern(a: Pattern, b: Pattern): boolean {
-  return a.kind === b.kind && a.seed === b.seed;
+  return a.kind === b.kind && a.seed === b.seed && a.wild === b.wild;
 }
 
 export function PatternPicker({
@@ -31,7 +32,13 @@ export function PatternPicker({
   const refreshLabel = t('theme.refreshPatterns');
 
   return (
-    <div role="group" aria-labelledby={id} className="min-w-0">
+    <div
+      role="group"
+      aria-labelledby={id}
+      data-wallpaper-palette
+      style={wallpaperPaletteStyle(selected)}
+      className="min-w-0 rounded-2xl border border-line bg-surface p-3"
+    >
       <div className="mb-3 flex items-center justify-between gap-2">
         <span id={id} className={hideLabel ? 'sr-only' : 'font-extrabold'}>
           {t('theme.pattern')}
@@ -59,7 +66,10 @@ export function PatternPicker({
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {choices.map((pattern, index) => {
-          const label = t('theme.patternOption', { number: index + 1 });
+          const label = t(
+            pattern.wild ? 'theme.wildPatternOption' : 'theme.patternOption',
+            { number: index + 1 }
+          );
           return (
             <label key={pattern.kind} className="relative block cursor-pointer">
               <input

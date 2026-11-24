@@ -48,6 +48,7 @@ export const PATTERN_KINDS = [
 export const PatternSpec = z.strictObject({
   kind: z.enum(PATTERN_KINDS),
   seed: z.int().min(0).max(0xffff_ffff),
+  wild: z.literal(true).optional(),
 });
 
 export type Pattern = z.infer<typeof PatternSpec>;

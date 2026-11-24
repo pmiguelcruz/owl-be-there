@@ -317,7 +317,7 @@ function EventHeader({
     },
   ].filter(Boolean) as { icon: ReactNode; text: string; user?: boolean }[];
   return (
-    <header className="flex flex-col gap-3">
+    <header className="event-intro flex flex-col gap-3 rounded-3xl border border-line px-4 py-3 shadow-card sm:px-5">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <h1 className="flex max-w-full min-w-0 flex-auto items-start gap-3 text-3xl leading-tight font-black sm:text-4xl">
           <span dir="auto" className="min-w-0 break-words">

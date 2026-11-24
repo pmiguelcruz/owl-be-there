@@ -38,6 +38,7 @@ const forkTexts = {
   'theme.pattern': 'Wallpaper pattern',
   'theme.refreshPatterns': 'Refresh patterns',
   'theme.patternOption': 'Pattern {number}',
+  'theme.wildPatternOption': 'Pattern {number}, wild colors',
   'theme.preview': 'Selected wallpaper',
   'theme.savePattern': 'Save pattern',
 } as const;

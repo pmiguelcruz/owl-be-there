@@ -139,26 +139,54 @@
 
 /* Tint event chrome with the wallpaper palette. Calendar availability keeps
  * its shared green and amber colors. */
-[data-event-palette] {
+[data-event-palette],
+[data-wallpaper-palette] {
   --owl-bg: var(--event-base);
-  --owl-surface: color-mix(in srgb, var(--event-base) 73%, var(--event-ink));
-  --owl-sunken: color-mix(in srgb, var(--event-base) 58%, var(--event-ink));
-  --owl-line: color-mix(in srgb, var(--event-base) 39%, var(--event-ink));
+  --owl-surface: color-mix(in srgb, var(--event-base) 85%, var(--event-ink));
+  --owl-sunken: color-mix(in srgb, var(--event-base) 76%, var(--event-ink));
+  --owl-line: color-mix(in srgb, var(--event-base) 52%, var(--event-ink));
   --owl-line-strong: color-mix(
     in srgb,
-    var(--event-ink) 70%,
+    var(--event-ink) 64%,
     var(--event-highlight)
   );
+  --owl-ink: var(--event-lettering);
+  --owl-muted: color-mix(
+    in srgb,
+    var(--event-lettering) 82%,
+    var(--event-base)
+  );
   --owl-brand: var(--event-highlight);
-  --owl-brand-hover: color-mix(in srgb, var(--event-highlight) 78%, white);
+  --owl-brand-hover: color-mix(
+    in srgb,
+    var(--event-highlight) 68%,
+    var(--event-lettering)
+  );
   --owl-brand-ink: var(--event-base);
   --owl-brand-soft: color-mix(
     in srgb,
     var(--event-base) 83%,
     var(--event-highlight)
   );
-  --owl-focus: color-mix(in srgb, var(--event-highlight) 68%, white);
+  --owl-focus: color-mix(
+    in srgb,
+    var(--event-highlight) 40%,
+    var(--event-lettering)
+  );
   --owl-heat-0: var(--owl-sunken);
+  --owl-heat-2: #206855;
+  --owl-heat-ink-low: #bbffd4;
+  color: var(--owl-ink);
+}
+
+[data-event-palette] .site-wordmark {
+  background: var(--owl-surface);
+  padding-inline: 0.25rem 0.65rem;
+}
+
+/* Keep event text readable even when a bright gradient runs behind it. */
+.event-intro {
+  background: color-mix(in srgb, var(--owl-surface) 94%, transparent);
 }
 
 /*

@@ -88,13 +88,14 @@ describe('PIN-protected event creation', () => {
     const headers = await creationHeaders(t.app);
     const theme = {
       version: 1,
-      pattern: { kind: 'diamonds', seed: 0xffff_ffff },
+      pattern: { kind: 'diamonds', seed: 0xffff_ffff, wild: true },
     };
     for (const invalid of [
       { ...theme, version: 2 },
       { ...theme, pattern: { ...theme.pattern, kind: '<svg />' } },
       { ...theme, pattern: { ...theme.pattern, seed: -1 } },
       { ...theme, pattern: { ...theme.pattern, seed: 1.5 } },
+      { ...theme, pattern: { ...theme.pattern, wild: 'bright' } },
     ]) {
       expect(
         (await create(headers, eventBody({ theme: invalid }))).statusCode

@@ -49,7 +49,7 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   expect(new Set(refreshed).size).toBe(10);
   expect(refreshed.every((recipe) => !original.includes(recipe))).toBe(true);
   await expect(selected).toHaveAttribute('data-pattern', original[0]!);
-  await picker.getByRole('radio', { name: 'Pattern 3', exact: true }).check();
+  await picker.getByRole('radio', { name: /^Pattern 3\b/ }).check();
   const wallpaper = refreshed[2]!;
   await expect(selected).toHaveAttribute('data-pattern', wallpaper);
   const colorFields = (svg: Locator) =>
@@ -121,13 +121,15 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await expect(eventWallpaper.locator('rect[filter]')).toHaveCount(1);
   await expect(eventWallpaper.locator('pattern')).toHaveAttribute(
     'patternTransform',
-    'scale(.5)'
+    'scale(.1)'
   );
   await expect(eventWallpaper.locator('pattern g')).toHaveAttribute(
     'opacity',
-    (await eventWallpaper.getAttribute('data-spacing')) === 'packed'
-      ? '0.18'
-      : '0.27'
+    (await eventWallpaper.getAttribute('data-wild')) === 'true'
+      ? '0.65'
+      : (await eventWallpaper.getAttribute('data-spacing')) === 'packed'
+        ? '0.31'
+        : '0.42'
   );
   const colors = page.locator('[data-event-palette]');
   const themeColor = (token: string) =>
@@ -204,6 +206,70 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await expect(page.getByRole('button', { name: 'Save pattern' })).toHaveCount(
     0
   );
+});
+
+test('a saved wild wallpaper leaves event text and controls readable', async ({
+  page,
+  request,
+}) => {
+  const { id } = await createEvent(request, {
+    title: 'Neon night',
+    description: 'Meet under the pink lights.',
+    theme: { version: 1, pattern: { kind: 'chevrons', seed: 112, wild: true } },
+  });
+  await openAsOrganiser(page, { id });
+  const wallpaper = page.locator('[data-wallpaper="event"]');
+  await expect(wallpaper).toHaveAttribute('data-pattern', 'chevrons:112:wild');
+  const heading = page.getByRole('heading', { name: 'Neon night' });
+  const surface = page.locator('.event-intro');
+  const description = surface.getByText('Meet under the pink lights.');
+  const button = page.getByRole('button', { name: 'Share', exact: true });
+
+  async function rgba(element: Locator, property: 'color' | 'backgroundColor') {
+    return element.evaluate((node, key) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d')!;
+      const style = getComputedStyle(node);
+      if (key === 'backgroundColor') {
+        // Measure the translucent panel over the brightest possible backdrop.
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, 1, 1);
+      }
+      context.fillStyle = style[key];
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    }, property);
+  }
+  function luminance(rgb: number[]) {
+    const factors = [0.2126, 0.7152, 0.0722];
+    return rgb.reduce((sum, value, i) => {
+      const channel = value / 255;
+      const linear =
+        channel <= 0.04045
+          ? channel / 12.92
+          : ((channel + 0.055) / 1.055) ** 2.4;
+      return sum + linear * factors[i]!;
+    }, 0);
+  }
+  for (const [label, backdrop] of [
+    [heading, surface],
+    [description, surface],
+    [button, button],
+  ] as const) {
+    const color = await rgba(label, 'color');
+    if (label === button) expect(Math.max(...color)).toBeLessThan(45);
+    else expect(Math.max(...color) - Math.min(...color)).toBeGreaterThan(25);
+    const shades = [
+      luminance(color),
+      luminance(await rgba(backdrop, 'backgroundColor')),
+    ];
+    expect(
+      (Math.max(...shades) + 0.05) / (Math.min(...shades) + 0.05)
+    ).toBeGreaterThanOrEqual(4.5);
+  }
+  await page.goto(`/e/${id}`);
+  await expect(wallpaper).toHaveAttribute('data-wild', 'true');
 });
 
 test('changing the range keeps the days the organiser already chose', async ({

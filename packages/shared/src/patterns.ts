@@ -20,91 +20,138 @@ interface Tile {
 }
 type Pick = (min: number, max: number) => number;
 
-// The first eight entries keep the color identity of earlier saved textiles.
+// Saved patterns keep their base hue while their accent colors get more saturated.
 const PALETTES = [
   {
     base: '#0e1427',
-    ink: '#384a77',
-    accent: '#655483',
-    thread: '#36716a',
-    highlight: '#aebdff',
+    ink: '#283fbd',
+    accent: '#7a49f8',
+    thread: '#00b5c5',
+    highlight: '#859cff',
+    lettering: '#b4c6ff',
   },
   {
     base: '#1e101b',
-    ink: '#5b2c4a',
-    accent: '#884e62',
-    thread: '#796035',
-    highlight: '#f1a9cb',
+    ink: '#7c1dc2',
+    accent: '#f4309d',
+    thread: '#f88d25',
+    highlight: '#ff78b6',
+    lettering: '#ffb8db',
   },
   {
     base: '#0a1918',
-    ink: '#214944',
-    accent: '#3e7062',
-    thread: '#79643b',
-    highlight: '#91dbc1',
+    ink: '#0c8065',
+    accent: '#00d393',
+    thread: '#23a1ee',
+    highlight: '#48edb0',
+    lettering: '#a0ffd6',
   },
   {
     base: '#1b1610',
-    ink: '#553b25',
-    accent: '#846039',
-    thread: '#72504a',
-    highlight: '#f5c384',
+    ink: '#9c3819',
+    accent: '#ff712c',
+    thread: '#f5c41c',
+    highlight: '#ffaf4b',
+    lettering: '#ffd597',
   },
   {
     base: '#161124',
-    ink: '#40365e',
-    accent: '#685688',
-    thread: '#416978',
-    highlight: '#c9aff3',
+    ink: '#5022be',
+    accent: '#b72afd',
+    thread: '#fa509b',
+    highlight: '#c499ff',
+    lettering: '#dfbaff',
   },
   {
     base: '#1f1216',
-    ink: '#5a3037',
-    accent: '#885053',
-    thread: '#486e69',
-    highlight: '#f1a69b',
+    ink: '#a12864',
+    accent: '#ff4d5e',
+    thread: '#faa62d',
+    highlight: '#ff8b7a',
+    lettering: '#ffbeb1',
   },
   {
     base: '#111914',
-    ink: '#3b5030',
-    accent: '#687343',
-    thread: '#776047',
-    highlight: '#bcda8f',
+    ink: '#3c7620',
+    accent: '#a7dc19',
+    thread: '#00ae93',
+    highlight: '#b8e654',
+    lettering: '#dcfc95',
   },
   {
     base: '#0d1720',
-    ink: '#2b4c5d',
-    accent: '#3f7080',
-    thread: '#655783',
-    highlight: '#97d5eb',
+    ink: '#195fbd',
+    accent: '#18baf4',
+    thread: '#9251fa',
+    highlight: '#51d3ff',
+    lettering: '#a6e9ff',
   },
   {
     base: '#1c1810',
-    ink: '#584521',
-    accent: '#786a35',
-    thread: '#947035',
-    highlight: '#f1da80',
+    ink: '#855015',
+    accent: '#ffd21a',
+    thread: '#fb6242',
+    highlight: '#ffda2e',
+    lettering: '#ffe48c',
   },
   {
     base: '#1e101e',
-    ink: '#5b2b55',
-    accent: '#84416b',
-    thread: '#6c546f',
-    highlight: '#eda4e1',
+    ink: '#7f2374',
+    accent: '#f32fcb',
+    thread: '#8841ff',
+    highlight: '#ff79da',
+    lettering: '#ffb7ed',
   },
   {
     base: '#131925',
-    ink: '#37476a',
-    accent: '#527596',
-    thread: '#536f55',
-    highlight: '#87d4db',
+    ink: '#1c5ead',
+    accent: '#1adfc8',
+    thread: '#7360ff',
+    highlight: '#63efd8',
+    lettering: '#afffed',
   },
   {
     base: '#1f1311',
-    ink: '#694031',
-    accent: '#925640',
-    thread: '#89663d',
-    highlight: '#f7b294',
+    ink: '#9b3329',
+    accent: '#ff754f',
+    thread: '#f33c88',
+    highlight: '#ff9b6d',
+    lettering: '#ffbe99',
+  },
+] as const;
+
+const WILD_PALETTES = [
+  {
+    base: '#140b26',
+    ink: '#9417e4',
+    accent: '#fd13b2',
+    thread: '#87fb03',
+    highlight: '#c4ff19',
+    lettering: '#e3ff94',
+  },
+  {
+    base: '#0b142b',
+    ink: '#173fea',
+    accent: '#1d43ff',
+    thread: '#ff2aaf',
+    highlight: '#21f3ec',
+    lettering: '#a5fcfa',
+  },
+  {
+    base: '#220b12',
+    ink: '#d8109d',
+    accent: '#ff3c49',
+    thread: '#ffcb08',
+    highlight: '#ffbf27',
+    lettering: '#ffe482',
+  },
+  {
+    base: '#071b19',
+    ink: '#087cde',
+    accent: '#00f58a',
+    thread: '#fe3fa7',
+    highlight: '#3dffaa',
+    lettering: '#aeffd1',
   },
 ] as const;
 
@@ -129,6 +176,7 @@ export function patternBatch(
   word: () => number,
   previous: readonly Pattern[] = []
 ): Pattern[] {
+  const includeWild = word() % 5 === 0;
   const oldKinds = new Set(previous.map(({ kind }) => kind));
   const motifs = shuffled(MOTIF_PATTERN_KINDS, word);
   const fresh = motifs.find((kind) => !oldKinds.has(kind)) ?? motifs[0]!;
@@ -138,6 +186,7 @@ export function patternBatch(
     ...shuffled(TEXTILE_PATTERN_KINDS, word).slice(0, 5),
   ] as const;
   const layouts = shuffled([0, 1, 2, 3, word() % 4], word);
+  const wildSlot = includeWild ? word() % kinds.length : -1;
   return shuffled(
     kinds.map((kind, index) => {
       const random = word() >>> 0;
@@ -147,7 +196,7 @@ export function patternBatch(
           : random;
       const match = previous.find((pattern) => pattern.kind === kind);
       if (match?.seed === seed) seed = (seed + 4) >>> 0;
-      return { kind, seed };
+      return { kind, seed, ...(index === wildSlot && { wild: true as const }) };
     }),
     word
   );
@@ -610,17 +659,19 @@ function tileFor(
   }
 }
 
-function paletteIndex(pattern: Pattern, random: () => number) {
+function choosePalette(pattern: Pattern, random: () => number) {
+  if (pattern.wild)
+    return WILD_PALETTES[Math.floor(random() * WILD_PALETTES.length)]!;
   const length = isMotif(pattern.kind) ? PALETTES.length : 8;
-  return Math.floor(random() * length);
+  return PALETTES[Math.floor(random() * length)]!;
 }
 
 export function patternPalette(pattern: Pattern) {
-  return PALETTES[paletteIndex(pattern, seeded(pattern.seed))]!;
+  return choosePalette(pattern, seeded(pattern.seed));
 }
 
 /** Layered elliptical color fields, with a separate seed from the tile geometry. */
-export function wallpaperLight(seed: number) {
+export function wallpaperLight(seed: number, wild = false) {
   const random = seeded((seed ^ 0x37ecad81) >>> 0);
   const tilt = 35 + random() * 100;
   const flip = random() < 0.5 ? 1 : -1;
@@ -633,7 +684,7 @@ export function wallpaperLight(seed: number) {
       radius: 0.71,
       squash: 0.61,
       angle: flip * tilt,
-      opacity: 0.51,
+      opacity: wild ? 0.94 : 0.77,
     },
     {
       tone: 'thread',
@@ -642,7 +693,7 @@ export function wallpaperLight(seed: number) {
       radius: 0.76,
       squash: 0.69,
       angle: flip * (tilt - 29),
-      opacity: 0.42,
+      opacity: wild ? 0.85 : 0.65,
     },
     {
       tone: 'ink',
@@ -651,7 +702,7 @@ export function wallpaperLight(seed: number) {
       radius: 0.75,
       squash: 0.42,
       angle: flip * (tilt + 17),
-      opacity: 0.49,
+      opacity: wild ? 0.78 : 0.61,
     },
     {
       tone: 'highlight',
@@ -660,18 +711,18 @@ export function wallpaperLight(seed: number) {
       radius: 0.69,
       squash: 0.38,
       angle: flip * (tilt + 48),
-      opacity: 0.18,
+      opacity: wild ? 0.78 : 0.42,
     },
   ] as const;
 }
 
 export function drawPattern(pattern: Pattern) {
   const random = seeded(pattern.seed);
-  const index = paletteIndex(pattern, random);
+  const palette = choosePalette(pattern, random);
   const pick: Pick = (min, max) => min + Math.floor(random() * (max - min + 1));
   const { kind, seed } = pattern;
   const tile = isMotif(kind)
     ? motifTile(kind, SPACINGS[seed % SPACINGS.length]!, pick)
     : tileFor(kind, pick);
-  return { ...tile, palette: PALETTES[index]!, weight: pick(12, 22) / 10 };
+  return { ...tile, palette, weight: pick(12, 22) / 10 };
 }
