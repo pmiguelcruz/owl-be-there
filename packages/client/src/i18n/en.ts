@@ -35,12 +35,12 @@ const forkTexts = {
   'admin.incorrect': 'Incorrect PIN.',
   'admin.expired':
     'Your admin session expired. Enter the PIN again to continue.',
-  'theme.pattern': 'Wallpaper pattern',
-  'theme.refreshPatterns': 'Refresh patterns',
-  'theme.patternOption': 'Pattern {number}',
-  'theme.wildPatternOption': 'Pattern {number}, wild colors',
-  'theme.preview': 'Selected wallpaper',
-  'theme.savePattern': 'Save pattern',
+  'theme.look': 'Look and feel',
+  'theme.refreshLooks': 'Refresh looks',
+  'theme.lookOption': 'Look {number}',
+  'theme.wildLookOption': 'Look {number}, wild colors',
+  'theme.preview': 'Selected look',
+  'theme.saveLook': 'Save look',
 } as const;
 
 export const en = {

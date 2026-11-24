@@ -20,4 +20,4 @@ export * from './texts.js';
 export * from './toggles.js';
 export * from './weekday.js';
 export * from './event-theme.js';
-export * from './patterns.js';
+export * from './wallpaper.js';

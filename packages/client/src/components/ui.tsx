@@ -17,10 +17,10 @@ export type ButtonVariant =
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-brand-ink hover:bg-brand-hover shadow-card',
+  primary: 'bg-brand-fill text-brand-ink hover:bg-brand-hover-fill shadow-card',
   secondary:
     'bg-surface text-ink border-2 border-line hover:border-line-strong',
-  danger: 'bg-danger text-danger-ink hover:opacity-90',
+  danger: 'bg-danger-fill text-danger-ink hover:opacity-90',
   // A destructive action that only opens a confirmation: framed like a
   // secondary button, in red.
   dangerOutline:

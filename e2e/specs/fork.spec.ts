@@ -43,17 +43,17 @@ test('the public home is only the saved events list and the header opens About',
   await expect(header.locator('.owl-eyes')).toHaveCount(1);
 });
 
-test('the homepage rotates both its pattern and gradient on refresh', async ({
+test('the homepage rotates its look and gradient on refresh', async ({
   page,
 }) => {
   await page.goto('/');
   const home = page.locator('[data-wallpaper="home"]');
   await expect(home).toBeVisible();
-  const original = (await home.getAttribute('data-pattern'))!.split(':')[0]!;
+  const original = (await home.getAttribute('data-look'))!.split(':')[0]!;
   const style = (await home.getAttribute('data-gradient'))!;
   await page.reload();
   await expect(home).toBeVisible();
-  expect((await home.getAttribute('data-pattern'))!.split(':')[0]).not.toBe(
+  expect((await home.getAttribute('data-look'))!.split(':')[0]).not.toBe(
     original
   );
   await expect(home).not.toHaveAttribute('data-gradient', style);

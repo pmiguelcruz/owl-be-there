@@ -142,8 +142,17 @@
 [data-event-palette],
 [data-wallpaper-palette] {
   --owl-bg: var(--event-base);
-  --owl-surface: color-mix(in srgb, var(--event-base) 85%, var(--event-ink));
-  --owl-sunken: color-mix(in srgb, var(--event-base) 76%, var(--event-ink));
+  --owl-surface-solid: color-mix(
+    in srgb,
+    var(--event-base) 85%,
+    var(--event-ink)
+  );
+  --owl-surface: color-mix(in srgb, var(--owl-surface-solid) 92%, transparent);
+  --owl-sunken: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--event-base) 76%, var(--event-ink)) 94%,
+    transparent
+  );
   --owl-line: color-mix(in srgb, var(--event-base) 52%, var(--event-ink));
   --owl-line-strong: color-mix(
     in srgb,
@@ -165,9 +174,16 @@
   --owl-brand-ink: var(--event-base);
   --owl-brand-soft: color-mix(
     in srgb,
-    var(--event-base) 83%,
-    var(--event-highlight)
+    color-mix(in srgb, var(--event-base) 83%, var(--event-highlight)) 94%,
+    transparent
   );
+  --owl-brand-fill: color-mix(in srgb, var(--owl-brand) 94%, transparent);
+  --owl-brand-hover-fill: color-mix(
+    in srgb,
+    var(--owl-brand-hover) 94%,
+    transparent
+  );
+  --owl-danger-fill: color-mix(in srgb, var(--owl-danger) 94%, transparent);
   --owl-focus: color-mix(
     in srgb,
     var(--event-highlight) 40%,
@@ -186,7 +202,11 @@
 
 /* Keep event text readable even when a bright gradient runs behind it. */
 .event-intro {
-  background: color-mix(in srgb, var(--owl-surface) 94%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--owl-surface-solid, var(--owl-surface)) 94%,
+    transparent
+  );
 }
 
 /*
@@ -217,10 +237,13 @@
   --color-muted: var(--owl-muted);
   --color-brand: var(--owl-brand);
   --color-brand-hover: var(--owl-brand-hover);
+  --color-brand-fill: var(--owl-brand-fill, var(--owl-brand));
+  --color-brand-hover-fill: var(--owl-brand-hover-fill, var(--owl-brand-hover));
   --color-brand-ink: var(--owl-brand-ink);
   --color-brand-soft: var(--owl-brand-soft);
   --color-focus: var(--owl-focus);
   --color-danger: var(--owl-danger);
+  --color-danger-fill: var(--owl-danger-fill, var(--owl-danger));
   --color-danger-ink: var(--owl-danger-ink);
   --color-danger-soft: var(--owl-danger-soft);
   --color-yes: var(--owl-yes);

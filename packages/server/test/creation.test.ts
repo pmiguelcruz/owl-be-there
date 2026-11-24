@@ -89,7 +89,6 @@ describe('PIN-protected event creation', () => {
     const theme = {
       version: 1,
       pattern: {
-        kind: 'diamonds',
         seed: 0xffff_ffff,
         wild: true,
         gradient: 'radial',

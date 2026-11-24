@@ -13,7 +13,7 @@
 
 This is [Pedro’s fork](https://github.com/pmiguelcruz/owl-be-there) of [Owl Be There](https://github.com/ni-c/owl-be-there), a whole-day group scheduling tool inspired by [Rallly](https://github.com/lukevella/rallly) and [Crab Fit](https://github.com/GRA0007/crab.fit). Participants open a link and mark their own availability. Admin reviews the group’s calendar. No accounts.
 
-The home page lists existing events whose links this browser has opened. Unlock **Admin** with the PIN to see all events, edit them, or choose **Plan an event**. Choose from ten randomly generated dark wallpaper patterns, refresh to see ten more, then send the participant link to your group.
+The home page lists existing events whose links this browser has opened. Unlock **Admin** with the PIN to see all events, edit them, or choose **Plan an event**. Choose from ten gradients under **Look and feel**, refresh for another set, then send the participant link to your group.
 
 ## Features
 

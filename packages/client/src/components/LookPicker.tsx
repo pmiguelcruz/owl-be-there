@@ -1,16 +1,18 @@
-import { patternBatch, type Pattern } from '@owl/shared';
+import { lookBatch, type WallpaperLook } from '@owl/shared';
 import { useId } from 'react';
 import { useI18n } from '../i18n/index.tsx';
 import { wallpaperPaletteStyle } from '../lib/wallpaperPalette.ts';
 import { EventWallpaper } from './EventWallpaper.tsx';
 import { Button } from './ui.tsx';
 
-export function randomPatterns(previous: readonly Pattern[] = []): Pattern[] {
+export function randomLooks(
+  previous: readonly WallpaperLook[] = []
+): WallpaperLook[] {
   const words = new Uint32Array(1);
-  return patternBatch(() => crypto.getRandomValues(words)[0]!, previous);
+  return lookBatch(() => crypto.getRandomValues(words)[0]!, previous);
 }
 
-export function samePattern(a: Pattern, b: Pattern): boolean {
+export function sameLook(a: WallpaperLook, b: WallpaperLook): boolean {
   return (
     a.kind === b.kind &&
     a.seed === b.seed &&
@@ -19,22 +21,22 @@ export function samePattern(a: Pattern, b: Pattern): boolean {
   );
 }
 
-export function PatternPicker({
+export function LookPicker({
   selected,
   choices,
   onRefresh,
   onSelect,
   hideLabel = false,
 }: {
-  selected: Pattern;
-  choices: Pattern[];
+  selected: WallpaperLook;
+  choices: WallpaperLook[];
   onRefresh(): void;
-  onSelect(pattern: Pattern): void;
+  onSelect(look: WallpaperLook): void;
   hideLabel?: boolean;
 }) {
   const { t } = useI18n();
   const id = useId();
-  const refreshLabel = t('theme.refreshPatterns');
+  const refreshLabel = t('theme.refreshLooks');
 
   return (
     <div
@@ -46,7 +48,7 @@ export function PatternPicker({
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <span id={id} className={hideLabel ? 'sr-only' : 'font-extrabold'}>
-          {t('theme.pattern')}
+          {t('theme.look')}
         </span>
         <Button
           className="ms-auto px-3"
@@ -70,19 +72,19 @@ export function PatternPicker({
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {choices.map((pattern, index) => {
+        {choices.map((look, index) => {
           const label = t(
-            pattern.wild ? 'theme.wildPatternOption' : 'theme.patternOption',
+            look.wild ? 'theme.wildLookOption' : 'theme.lookOption',
             { number: index + 1 }
           );
           return (
-            <label key={pattern.kind} className="relative block cursor-pointer">
+            <label key={look.seed} className="relative block cursor-pointer">
               <input
                 type="radio"
                 name={id}
                 aria-label={label}
-                checked={samePattern(selected, pattern)}
-                onChange={() => onSelect(pattern)}
+                checked={sameLook(selected, look)}
+                onChange={() => onSelect(look)}
                 className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0"
               />
               <span
@@ -90,7 +92,7 @@ export function PatternPicker({
                 className="block h-16 overflow-hidden rounded-lg border border-line peer-checked:ring-2 peer-checked:ring-focus peer-checked:ring-offset-2 peer-checked:ring-offset-surface peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-focus sm:h-20"
               >
                 <EventWallpaper
-                  pattern={pattern}
+                  look={look}
                   className="block size-full"
                   surface="preview"
                 />
@@ -102,7 +104,7 @@ export function PatternPicker({
       <figure className="mt-4 overflow-hidden rounded-xl border border-line">
         <figcaption className="sr-only">{t('theme.preview')}</figcaption>
         <EventWallpaper
-          pattern={selected}
+          look={selected}
           className="block h-24 w-full"
           surface="preview"
         />

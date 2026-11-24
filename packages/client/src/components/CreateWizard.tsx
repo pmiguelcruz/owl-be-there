@@ -26,7 +26,7 @@ import {
 import { firstWeekdayFor, weekdayName, weekdayOrder } from '../lib/locale.ts';
 import { navigate } from '../lib/route.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
-import { PatternPicker, randomPatterns } from './PatternPicker.tsx';
+import { LookPicker, randomLooks } from './LookPicker.tsx';
 import { CalendarGrid } from './CalendarGrid.tsx';
 import { Button, Card, Field, Notice, TextArea, TextInput } from './ui.tsx';
 
@@ -53,8 +53,8 @@ export function CreateWizard({
 
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
-  const [patterns, setPatterns] = useState(randomPatterns);
-  const [pattern, setPattern] = useState(patterns[0]!);
+  const [looks, setLooks] = useState(randomLooks);
+  const [look, setLook] = useState(looks[0]!);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [creatorName, setCreatorName] = useState('');
@@ -163,7 +163,7 @@ export function CreateWizard({
       const created = await api.createEvent(
         {
           title,
-          theme: { version: 1, pattern },
+          theme: { version: 1, pattern: look },
           language,
           durationDays: duration,
           days: candidates,
@@ -232,11 +232,11 @@ export function CreateWizard({
                 />
               )}
             </Field>
-            <PatternPicker
-              choices={patterns}
-              onRefresh={() => setPatterns(randomPatterns(patterns))}
-              selected={pattern}
-              onSelect={setPattern}
+            <LookPicker
+              choices={looks}
+              onRefresh={() => setLooks(randomLooks(looks))}
+              selected={look}
+              onSelect={setLook}
             />
             <Field
               label={t('create.description')}

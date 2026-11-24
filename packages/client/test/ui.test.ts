@@ -12,13 +12,13 @@ import {
 // until its classes are listed.
 const VARIANT_CLASSES: Record<ButtonVariant, string[]> = {
   primary: [
-    'bg-brand',
+    'bg-brand-fill',
     'text-brand-ink',
-    'hover:bg-brand-hover',
+    'hover:bg-brand-hover-fill',
     'shadow-card',
   ],
   secondary: ['bg-surface', 'text-ink', 'border-2', 'hover:border-line-strong'],
-  danger: ['bg-danger', 'text-danger-ink', 'hover:opacity-90'],
+  danger: ['bg-danger-fill', 'text-danger-ink', 'hover:opacity-90'],
   dangerOutline: ['bg-surface', 'text-danger', 'hover:border-danger'],
 };
 const SIZE_CLASSES: Record<ButtonSize, string[]> = {

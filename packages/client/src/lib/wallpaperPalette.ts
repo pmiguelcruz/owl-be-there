@@ -1,15 +1,14 @@
 import {
-  PATTERN_KINDS,
-  PatternSpec,
-  patternPalette,
+  WallpaperLookSpec,
+  lookPalette,
   WALLPAPER_GRADIENTS,
-  type Pattern,
+  type WallpaperLook,
 } from '@owl/shared';
 import type { CSSProperties } from 'react';
 import { browserBacking, Store } from './storage.ts';
 
-export function wallpaperPaletteStyle(pattern: Pattern): CSSProperties {
-  const { base, ink, highlight, lettering } = patternPalette(pattern);
+export function wallpaperPaletteStyle(look: WallpaperLook): CSSProperties {
+  const { base, ink, highlight, lettering } = lookPalette(look);
   return {
     '--event-base': base,
     '--event-ink': ink,
@@ -21,21 +20,20 @@ export function wallpaperPaletteStyle(pattern: Pattern): CSSProperties {
 const homeWallpaper = new Store(browserBacking('sessionStorage'));
 const homeKey = 'owl.home-wallpaper';
 
-export function newHomeWallpaper(): Pattern {
-  const previous = homeWallpaper.read(homeKey, PatternSpec);
-  const kinds = PATTERN_KINDS.filter((kind) => kind !== previous?.kind);
+export function newHomeWallpaper(): WallpaperLook {
+  const previous = homeWallpaper.read(homeKey, WallpaperLookSpec);
   const gradients = WALLPAPER_GRADIENTS.filter(
     (style) => style !== previous?.gradient
   );
-  const words = crypto.getRandomValues(new Uint32Array(4));
+  const words = crypto.getRandomValues(new Uint32Array(3));
+  const seed = words[1]!;
   return {
-    kind: kinds[words[0]! % kinds.length]!,
-    gradient: gradients[words[1]! % gradients.length]!,
-    seed: words[2]!,
-    ...(words[3]! % 5 === 0 && { wild: true }),
+    gradient: gradients[words[0]! % gradients.length]!,
+    seed: seed === previous?.seed ? (seed + 1) >>> 0 : seed,
+    ...(words[2]! % 5 === 0 && { wild: true }),
   };
 }
 
-export function rememberHomeWallpaper(pattern: Pattern): void {
-  homeWallpaper.write(homeKey, pattern);
+export function rememberHomeWallpaper(look: WallpaperLook): void {
+  homeWallpaper.write(homeKey, look);
 }

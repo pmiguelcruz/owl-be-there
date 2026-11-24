@@ -1,42 +1,22 @@
-import { drawPattern, wallpaperGradient, type Pattern } from '@owl/shared';
-import { memo, useId, useLayoutEffect, useMemo, useRef } from 'react';
 import {
-  paintWallpaperMarks,
-  WALLPAPER_REPEAT_SCALE,
-} from '../lib/wallpaperMarks.ts';
+  lookPalette,
+  wallpaperGradient,
+  type WallpaperLook,
+} from '@owl/shared';
+import { memo, useId } from 'react';
 
 export const EventWallpaper = memo(function EventWallpaper({
-  pattern,
+  look,
   className,
   surface = 'event',
 }: {
-  pattern: Pattern;
+  look: WallpaperLook;
   className: string;
   surface?: 'event' | 'home' | 'preview';
 }) {
   const id = useId();
-  const marks = useRef<HTMLCanvasElement>(null);
-  const tile = useMemo(() => drawPattern(pattern), [pattern]);
-  const gradient = useMemo(() => wallpaperGradient(pattern), [pattern]);
-  const { palette, spacing } = tile;
-  const markOpacity = pattern.wild ? 0.46 : spacing === 'packed' ? 0.22 : 0.32;
-
-  useLayoutEffect(() => {
-    const canvas = marks.current!;
-    let previousWidth = 0;
-    let previousHeight = 0;
-    const paint = () => {
-      const { width, height } = canvas.getBoundingClientRect();
-      if (width === previousWidth && height === previousHeight) return;
-      previousWidth = width;
-      previousHeight = height;
-      paintWallpaperMarks(canvas, tile, gradient, width, height);
-    };
-    paint();
-    const resize = new ResizeObserver(paint);
-    resize.observe(canvas);
-    return () => resize.disconnect();
-  }, [tile, gradient]);
+  const palette = lookPalette(look);
+  const gradient = wallpaperGradient(look);
 
   return (
     <div
@@ -44,10 +24,8 @@ export const EventWallpaper = memo(function EventWallpaper({
       className={`${surface === 'preview' ? 'relative' : ''} isolate ${className}`}
       data-wallpaper={surface}
       data-gradient={gradient.style}
-      data-repeat-scale={WALLPAPER_REPEAT_SCALE}
-      data-spacing={spacing}
-      data-wild={pattern.wild}
-      data-pattern={`${pattern.kind}:${pattern.seed}${pattern.wild ? ':wild' : ''}`}
+      data-wild={look.wild}
+      data-look={`${look.seed}:${gradient.style}${look.wild ? ':wild' : ''}`}
     >
       <svg className="absolute inset-0 size-full" focusable="false">
         <defs>
@@ -64,7 +42,7 @@ export const EventWallpaper = memo(function EventWallpaper({
               <stop
                 offset=".54"
                 stopColor={palette.accent}
-                stopOpacity={pattern.wild ? '.96' : '.76'}
+                stopOpacity={look.wild ? '.96' : '.76'}
               />
               <stop offset=".76" stopColor={palette.thread} stopOpacity=".64" />
               <stop offset="1" stopColor={palette.base} />
@@ -79,7 +57,7 @@ export const EventWallpaper = memo(function EventWallpaper({
             >
               <stop
                 stopColor={palette.highlight}
-                stopOpacity={pattern.wild ? '.84' : '.57'}
+                stopOpacity={look.wild ? '.84' : '.57'}
               />
               <stop offset=".29" stopColor={palette.accent} stopOpacity=".84" />
               <stop offset=".56" stopColor={palette.thread} stopOpacity=".55" />
@@ -128,11 +106,6 @@ export const EventWallpaper = memo(function EventWallpaper({
           <rect width="100%" height="100%" fill={`url(#${id})`} />
         )}
       </svg>
-      <canvas
-        ref={marks}
-        className="absolute inset-0 size-full"
-        style={{ opacity: markOpacity }}
-      />
     </div>
   );
 });

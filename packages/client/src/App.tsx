@@ -2,7 +2,7 @@ import {
   APP_NAME,
   hasImprint,
   LANGUAGE_NAMES,
-  type Pattern,
+  type WallpaperLook,
 } from '@owl/shared';
 import {
   useCallback,
@@ -71,8 +71,8 @@ function Shell() {
   const instanceState = useInstance();
   const instance = instanceState.info;
   const [adminSession, setAdminSession] = useState<string | null>(null);
-  const [eventPattern, setEventPattern] = useState<Pattern | null>(null);
-  const [homePattern] = useState(newHomeWallpaper);
+  const [eventLook, setEventLook] = useState<WallpaperLook | null>(null);
+  const [homeLook] = useState(newHomeWallpaper);
   const clearAdmin = useCallback(() => setAdminSession(null), []);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
@@ -98,11 +98,11 @@ function Shell() {
     route.page === 'event' ||
     (route.page === 'admin' && Boolean(route.id && adminSession));
   const homePage = route.page === 'home';
-  const pagePattern = homePage ? homePattern : eventPage ? eventPattern : null;
-  const palette = pagePattern ? wallpaperPaletteStyle(pagePattern) : undefined;
+  const pageLook = homePage ? homeLook : eventPage ? eventLook : null;
+  const palette = pageLook ? wallpaperPaletteStyle(pageLook) : undefined;
   useEffect(() => {
-    if (homePage) rememberHomeWallpaper(homePattern);
-  }, [homePage, homePattern]);
+    if (homePage) rememberHomeWallpaper(homeLook);
+  }, [homePage, homeLook]);
   useEffect(() => {
     if (!eventPage) {
       document.title = heading
@@ -131,7 +131,7 @@ function Shell() {
       page = (
         <EventPage
           key={route.id}
-          onPattern={setEventPattern}
+          onLook={setEventLook}
           id={route.id}
           publicUrl={instance?.publicUrl ?? null}
         />
@@ -145,7 +145,7 @@ function Shell() {
         route.id && adminSession ? (
           <EventPage
             key={`admin:${route.id}`}
-            onPattern={setEventPattern}
+            onLook={setEventLook}
             id={route.id}
             publicUrl={instance?.publicUrl ?? null}
             adminToken={adminSession}
@@ -177,7 +177,7 @@ function Shell() {
     >
       {homePage && (
         <EventWallpaper
-          pattern={homePattern}
+          look={homeLook}
           surface="home"
           className="pointer-events-none fixed inset-0 -z-10"
         />

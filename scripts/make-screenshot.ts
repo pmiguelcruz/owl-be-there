@@ -111,7 +111,7 @@ async function sampleEvent(): Promise<string> {
       days: event.days,
       language: 'en',
       durationDays: 1,
-      theme: { version: 1, pattern: { kind: 'printed-dots', seed: 41 } },
+      theme: { version: 1, pattern: { seed: 41, gradient: 'flow' } },
     },
     { [ADMIN_HEADER]: token }
   );

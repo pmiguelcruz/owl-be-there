@@ -2,9 +2,9 @@ import {
   APP_NAME,
   formatDayRange,
   googleCalendarUrl,
-  patternFor,
+  lookFor,
   type EventSnapshotData,
-  type Pattern,
+  type WallpaperLook,
 } from '@owl/shared';
 import {
   useCallback,
@@ -52,13 +52,13 @@ export function EventPage({
   id,
   publicUrl,
   adminToken = null,
-  onPattern,
+  onLook,
   onAdminLost = noop,
 }: {
   id: string;
   publicUrl: string | null;
   adminToken?: string | null;
-  onPattern(pattern: Pattern | null): void;
+  onLook(look: WallpaperLook | null): void;
   onAdminLost?(): void;
 }) {
   const { t } = useI18n();
@@ -102,13 +102,13 @@ export function EventPage({
   // Keep the title and favicon in step with the loaded event.
   const loaded = state.status === 'ready' ? state.data.event : null;
   const theme = loaded?.theme;
-  const pattern = useMemo(() => patternFor(id, theme), [id, theme]);
+  const look = useMemo(() => lookFor(id, theme), [id, theme]);
   const hasEvent = loaded !== null;
   useLayoutEffect(() => {
     if (!hasEvent) return;
-    onPattern(pattern);
-    return () => onPattern(null);
-  }, [hasEvent, onPattern, pattern]);
+    onLook(look);
+    return () => onLook(null);
+  }, [hasEvent, onLook, look]);
   useEffect(() => {
     setFavicon(OWL_ICON);
     if (loaded) {
@@ -146,7 +146,7 @@ export function EventPage({
   return (
     <EventView
       data={state.data}
-      pattern={pattern}
+      look={look}
       stale={state.stale}
       store={store}
       adminToken={adminToken}
@@ -167,7 +167,7 @@ export function EventPage({
 
 interface EventViewProps {
   data: EventSnapshotData;
-  pattern: Pattern;
+  look: WallpaperLook;
   stale: boolean;
   store: EventStore;
   adminToken: string | null;
@@ -234,7 +234,7 @@ function EventView(props: EventViewProps) {
   return (
     <div className="flex flex-col gap-5">
       <EventWallpaper
-        pattern={props.pattern}
+        look={props.look}
         className="pointer-events-none fixed inset-0 -z-10"
       />
       <EventHeader

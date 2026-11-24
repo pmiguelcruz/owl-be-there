@@ -1,8 +1,8 @@
 import {
   LIMITS,
   maxISODate,
-  patternFor,
-  type Pattern,
+  lookFor,
+  type WallpaperLook,
   type EventSnapshotData,
   type ISODate,
   type Mark,
@@ -47,11 +47,7 @@ import {
 import { clearSession } from '../lib/prefs.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
 import { CalendarGrid } from './CalendarGrid.tsx';
-import {
-  PatternPicker,
-  randomPatterns,
-  samePattern,
-} from './PatternPicker.tsx';
+import { LookPicker, randomLooks, sameLook } from './LookPicker.tsx';
 import {
   ChevronEndIcon,
   LockIcon,
@@ -94,31 +90,31 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Where in the panel a message belongs: next to the control that caused it. */
-type Place = 'status' | 'details' | 'pattern' | 'days' | 'people' | 'delete';
+type Place = 'status' | 'details' | 'look' | 'days' | 'people' | 'delete';
 
-function PatternForm({
+function LookForm({
   current,
   busy,
   onEdit,
   onSave,
 }: {
-  current: Pattern;
+  current: WallpaperLook;
   busy: boolean;
   onEdit(): void;
-  onSave(pattern: Pattern): Promise<boolean>;
+  onSave(look: WallpaperLook): Promise<boolean>;
 }) {
   const { t } = useI18n();
-  const [choices, setChoices] = useState(randomPatterns);
-  const [draft, setDraft] = useState<Pattern | null>(null);
+  const [choices, setChoices] = useState(randomLooks);
+  const [draft, setDraft] = useState<WallpaperLook | null>(null);
   const selected = draft ?? current;
   return (
     <div className="grid gap-4">
-      <PatternPicker
+      <LookPicker
         choices={choices}
         selected={selected}
-        onRefresh={() => setChoices(randomPatterns(choices))}
-        onSelect={(pattern) => {
-          setDraft(pattern);
+        onRefresh={() => setChoices(randomLooks(choices))}
+        onSelect={(look) => {
+          setDraft(look);
           onEdit();
         }}
         hideLabel
@@ -126,7 +122,7 @@ function PatternForm({
       <Button
         className="justify-self-start"
         variant="primary"
-        disabled={busy || samePattern(selected, current)}
+        disabled={busy || sameLook(selected, current)}
         onClick={() => {
           void onSave(selected).then((saved) => {
             if (saved)
@@ -134,7 +130,7 @@ function PatternForm({
           });
         }}
       >
-        {t('theme.savePattern')}
+        {t('theme.saveLook')}
       </Button>
     </div>
   );
@@ -243,22 +239,22 @@ export function AdminPanel(props: AdminPanelProps) {
         />
         {noticeAt('details')}
       </Section>
-      <Section title={t('theme.pattern')}>
-        <PatternForm
-          current={patternFor(event.id, event.theme)}
+      <Section title={t('theme.look')}>
+        <LookForm
+          current={lookFor(event.id, event.theme)}
           busy={busy}
           onEdit={clearMessage}
-          onSave={(pattern) =>
-            run('pattern', () =>
+          onSave={(look) =>
+            run('look', () =>
               api.updateEvent(
                 event.id,
-                { theme: { version: 1, pattern } },
+                { theme: { version: 1, pattern: look } },
                 adminToken
               )
             )
           }
         />
-        {noticeAt('pattern')}
+        {noticeAt('look')}
       </Section>
       <Section title={t('admin.days')}>
         <DaysEditor

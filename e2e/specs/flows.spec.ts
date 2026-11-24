@@ -21,37 +21,54 @@ import {
 
 const D = (offset: number) => dayFromNow(offset);
 
+async function rgba(
+  element: Locator,
+  property: 'color' | 'backgroundColor',
+  backdrop?: string
+) {
+  return element.evaluate(
+    (node, { property, backdrop }) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d')!;
+      if (backdrop) {
+        context.fillStyle = backdrop;
+        context.fillRect(0, 0, 1, 1);
+      }
+      context.fillStyle = getComputedStyle(node)[property];
+      context.fillRect(0, 0, 1, 1);
+      return Array.from(context.getImageData(0, 0, 1, 1).data);
+    },
+    { property, backdrop }
+  );
+}
+
 test('an organiser creates an event with the wizard and gets the share sheet', async ({
   page,
 }) => {
   await startWizard(page);
   await page.getByLabel('Title').fill('Five-a-side');
-  const picker = page.getByRole('group', { name: 'Wallpaper pattern' });
+  const picker = page.getByRole('group', { name: 'Look and feel' });
   const options = picker.getByRole('radio');
-  const selected = picker.locator('figure [data-pattern]');
+  const selected = picker.locator('figure [data-look]');
   const recipes = () =>
     picker
-      .locator('label [data-pattern]')
+      .locator('label [data-look]')
       .evaluateAll((choices) =>
-        choices.map((choice) => choice.getAttribute('data-pattern'))
+        choices.map((choice) => choice.getAttribute('data-look'))
       );
   await expect(options).toHaveCount(10);
+  await expect(picker.locator('canvas, pattern')).toHaveCount(0);
   const original = await recipes();
   expect(new Set(original).size).toBe(10);
-  await expect(
-    picker.locator('label [data-spacing="sparse"]').first()
-  ).toBeVisible();
-  await expect(
-    picker.locator('label [data-spacing="packed"]').first()
-  ).toBeVisible();
-  await picker.getByRole('button', { name: 'Refresh patterns' }).click();
+  await picker.getByRole('button', { name: 'Refresh looks' }).click();
   const refreshed = await recipes();
   expect(new Set(refreshed).size).toBe(10);
   expect(refreshed.every((recipe) => !original.includes(recipe))).toBe(true);
-  await expect(selected).toHaveAttribute('data-pattern', original[0]!);
-  await picker.getByRole('radio', { name: /^Pattern 3\b/ }).check();
+  await expect(selected).toHaveAttribute('data-look', original[0]!);
+  await picker.getByRole('radio', { name: /^Look 3\b/ }).check();
   const wallpaper = refreshed[2]!;
-  await expect(selected).toHaveAttribute('data-pattern', wallpaper);
+  await expect(selected).toHaveAttribute('data-look', wallpaper);
   const colorsOf = (wallpaper: Locator) =>
     wallpaper.locator('linearGradient, radialGradient');
   const colorFields = (wallpaper: Locator) =>
@@ -126,20 +143,10 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
     page.getByRole('heading', { name: 'Five-a-side' })
   ).toBeVisible();
   const eventWallpaper = page.locator('[data-wallpaper="event"]');
-  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  await expect(eventWallpaper).toHaveAttribute('data-look', wallpaper);
   expect(await colorFields(eventWallpaper)).toEqual(originalFields);
-  await expect(eventWallpaper).toHaveAttribute('data-repeat-scale', '0.5');
   await expect(eventWallpaper).toHaveAttribute('data-gradient', gradientStyle!);
-  await expect
-    .poll(() =>
-      eventWallpaper.locator('canvas').evaluate((canvas: HTMLCanvasElement) =>
-        canvas
-          .getContext('2d')!
-          .getImageData(0, 0, canvas.width, canvas.height)
-          .data.some((channel, index) => index % 4 === 3 && channel > 0)
-      )
-    )
-    .toBe(true);
+  await expect(eventWallpaper.locator('canvas, pattern')).toHaveCount(0);
   const colors = page.locator('[data-event-palette]');
   const themeColor = (token: string) =>
     colors.evaluate(
@@ -154,32 +161,41 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
     initialBase
   );
   const button = page.getByRole('button', { name: 'Share', exact: true });
-  const rgb = (hex: string) =>
-    `rgb(${hex
+  const accentMatches = async (hex: string) => {
+    const rgb = hex
       .slice(1)
       .match(/../g)!
-      .map((channel) => parseInt(channel, 16))
-      .join(', ')})`;
-  await expect(button).toHaveCSS('background-color', rgb(initialAccent));
+      .map((channel) => parseInt(channel, 16));
+    const [r, g, b, alpha] = await rgba(button, 'backgroundColor');
+    return (
+      alpha! >= 237 &&
+      alpha! <= 242 &&
+      [r, g, b].every((channel, index) => Math.abs(channel! - rgb[index]!) <= 2)
+    );
+  };
+  await expect.poll(() => accentMatches(initialAccent)).toBe(true);
   const about = page.getByRole('link', { name: 'About', exact: true });
   const card = page.locator('main section.bg-surface:visible').first();
   const background = (element: Locator) =>
     element.evaluate((node) => getComputedStyle(node).backgroundColor);
   const initialSurface = await background(card);
+  const [, , , panelAlpha] = await rgba(card, 'backgroundColor');
+  expect(panelAlpha).toBeGreaterThanOrEqual(231);
+  expect(panelAlpha).toBeLessThanOrEqual(237);
   await expect(about).toHaveCSS('background-color', initialSurface);
 
   const id = new URL(page.url()).pathname.split('/').at(-1)!;
   await openAsOrganiser(page, { id });
-  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  await expect(eventWallpaper).toHaveAttribute('data-look', wallpaper);
   await page
     .locator('details > summary')
-    .filter({ hasText: 'Wallpaper pattern' })
+    .filter({ hasText: 'Look and feel' })
     .click();
-  const editor = page.getByRole('group', { name: 'Wallpaper pattern' });
-  const preview = editor.locator('figure [data-pattern]');
-  await expect(preview).toHaveAttribute('data-pattern', wallpaper);
+  const editor = page.getByRole('group', { name: 'Look and feel' });
+  const preview = editor.locator('figure [data-look]');
+  await expect(preview).toHaveAttribute('data-look', wallpaper);
   const otherColor = await editor
-    .locator('label [data-pattern]')
+    .locator('label [data-look]')
     .evaluateAll(
       (options, base) =>
         options.findIndex(
@@ -190,15 +206,15 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
     );
   expect(otherColor).toBeGreaterThanOrEqual(0);
   await editor.getByRole('radio').nth(otherColor).check();
-  const replacement = (await preview.getAttribute('data-pattern'))!;
+  const replacement = (await preview.getAttribute('data-look'))!;
   const replacementFields = await colorFields(preview);
   expect(replacementFields).not.toEqual(originalFields);
-  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
-  await page.getByRole('button', { name: 'Save pattern' }).click();
-  await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  await expect(eventWallpaper).toHaveAttribute('data-look', wallpaper);
+  await page.getByRole('button', { name: 'Save look' }).click();
+  await expect(eventWallpaper).toHaveAttribute('data-look', replacement);
   const newAccent = await themeColor('--owl-brand');
   expect(newAccent).not.toBe(initialAccent);
-  await expect(button).toHaveCSS('background-color', rgb(newAccent));
+  await expect.poll(() => accentMatches(newAccent)).toBe(true);
   const newSurface = await background(card);
   expect(newSurface).not.toBe(initialSurface);
   await expect(about).toHaveCSS('background-color', newSurface);
@@ -209,12 +225,10 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
 
   // Participants get the saved wallpaper with their registration view.
   await page.goto(new URL(link).pathname);
-  await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  await expect(eventWallpaper).toHaveAttribute('data-look', replacement);
   expect(await colorFields(eventWallpaper)).toEqual(replacementFields);
   expect(await themeColor('--owl-brand')).toBe(newAccent);
-  await expect(page.getByRole('button', { name: 'Save pattern' })).toHaveCount(
-    0
-  );
+  await expect(page.getByRole('button', { name: 'Save look' })).toHaveCount(0);
 });
 
 test('a saved wild wallpaper leaves event text and controls readable', async ({
@@ -228,28 +242,12 @@ test('a saved wild wallpaper leaves event text and controls readable', async ({
   });
   await openAsOrganiser(page, { id });
   const wallpaper = page.locator('[data-wallpaper="event"]');
-  await expect(wallpaper).toHaveAttribute('data-pattern', 'chevrons:112:wild');
+  await expect(wallpaper).toHaveAttribute('data-look', '112:flow:wild');
   const heading = page.getByRole('heading', { name: 'Neon night' });
   const surface = page.locator('.event-intro');
   const description = surface.getByText('Meet under the pink lights.');
   const button = page.getByRole('button', { name: 'Share', exact: true });
 
-  async function rgba(element: Locator, property: 'color' | 'backgroundColor') {
-    return element.evaluate((node, key) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 1;
-      const context = canvas.getContext('2d')!;
-      const style = getComputedStyle(node);
-      if (key === 'backgroundColor') {
-        // Measure the translucent panel over the brightest possible backdrop.
-        context.fillStyle = '#fff';
-        context.fillRect(0, 0, 1, 1);
-      }
-      context.fillStyle = style[key];
-      context.fillRect(0, 0, 1, 1);
-      return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
-    }, property);
-  }
   function luminance(rgb: number[]) {
     const factors = [0.2126, 0.7152, 0.0722];
     return rgb.reduce((sum, value, i) => {
@@ -266,12 +264,20 @@ test('a saved wild wallpaper leaves event text and controls readable', async ({
     [description, surface],
     [button, button],
   ] as const) {
-    const color = await rgba(label, 'color');
+    const color = (await rgba(label, 'color')).slice(0, 3);
     if (label === button) expect(Math.max(...color)).toBeLessThan(45);
     else expect(Math.max(...color) - Math.min(...color)).toBeGreaterThan(25);
     const shades = [
       luminance(color),
-      luminance(await rgba(backdrop, 'backgroundColor')),
+      luminance(
+        (
+          await rgba(
+            backdrop,
+            'backgroundColor',
+            label === button ? '#000' : '#fff'
+          )
+        ).slice(0, 3)
+      ),
     ];
     expect(
       (Math.max(...shades) + 0.05) / (Math.min(...shades) + 0.05)
@@ -383,7 +389,7 @@ test('legacy icons give way to stable dark wallpapers and the owl favicon', asyn
   await page.goto(`/e/${second.id}`);
   await expect(page).toHaveTitle('Chess night · Owl Be There');
   await expect(wallpaper).toBeVisible();
-  const recipe = (await wallpaper.getAttribute('data-pattern'))!;
+  const recipe = (await wallpaper.getAttribute('data-look'))!;
   const darkMode = await page
     .locator('html')
     .evaluate((html) => getComputedStyle(html).colorScheme);
@@ -392,7 +398,7 @@ test('legacy icons give way to stable dark wallpapers and the owl favicon', asyn
   await page.goto(`/e/${first.id}`);
   await expect(page).toHaveTitle('Kick-off · Owl Be There');
   await expect(icon).toHaveAttribute('href', '/favicon.svg');
-  await expect(wallpaper).not.toHaveAttribute('data-pattern', recipe);
+  await expect(wallpaper).not.toHaveAttribute('data-look', recipe);
   await expect(page.getByRole('heading', { name: 'Kick-off' })).toHaveText(
     'Kick-off'
   );
@@ -401,7 +407,7 @@ test('legacy icons give way to stable dark wallpapers and the owl favicon', asyn
   await expect(page.getByRole('list', { name: 'Your events' })).toBeVisible();
   await page.getByRole('link', { name: /Chess night/ }).click();
   await expect(page).toHaveTitle('Chess night · Owl Be There');
-  await expect(wallpaper).toHaveAttribute('data-pattern', recipe);
+  await expect(wallpaper).toHaveAttribute('data-look', recipe);
   await expect(icon).toHaveAttribute('href', '/favicon.svg');
 });
 

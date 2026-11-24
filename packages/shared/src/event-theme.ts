@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const LEGACY_TEXTILE_KINDS = [
+export const LEGACY_TEXTILE_KINDS = [
   'printed-dots',
   'gingham',
   'stripes',
@@ -11,17 +11,14 @@ const LEGACY_TEXTILE_KINDS = [
   'lattice',
   'honeycomb',
   'houndstooth',
-] as const;
-
-export const TEXTILE_PATTERN_KINDS = [
-  ...LEGACY_TEXTILE_KINDS,
   'chevrons',
   'scallops',
   'waves',
   'azulejo',
 ] as const;
 
-export const MOTIF_PATTERN_KINDS = [
+const legacyKinds = [
+  ...LEGACY_TEXTILE_KINDS,
   'stars',
   'hearts',
   'sparks',
@@ -40,33 +37,27 @@ export const MOTIF_PATTERN_KINDS = [
   'umbrellas',
 ] as const;
 
-export const PATTERN_KINDS = [
-  ...TEXTILE_PATTERN_KINDS,
-  ...MOTIF_PATTERN_KINDS,
-] as const;
-
 export const WALLPAPER_GRADIENTS = ['flow', 'linear', 'radial'] as const;
 
-export const PatternSpec = z.strictObject({
-  kind: z.enum(PATTERN_KINDS),
+export const WallpaperLookSpec = z.strictObject({
+  // Old recipes retain their palette family. New looks only store gradients.
+  kind: z.enum(legacyKinds).optional(),
   seed: z.int().min(0).max(0xffff_ffff),
   wild: z.literal(true).optional(),
   gradient: z.enum(WALLPAPER_GRADIENTS).optional(),
 });
 
-export type Pattern = z.infer<typeof PatternSpec>;
+export type WallpaperLook = z.infer<typeof WallpaperLookSpec>;
 
-export const PatternTheme = z.strictObject({
+export const WallpaperTheme = z.strictObject({
   version: z.literal(1),
-  pattern: PatternSpec,
+  pattern: WallpaperLookSpec,
 });
-
-export type PatternThemeData = z.infer<typeof PatternTheme>;
 
 const color = z.string().regex(/^#[a-f0-9]{6}$/i);
 
 // Keep decoding themes written by earlier versions. New selections store a
-// pattern recipe, so the same wallpaper can be rendered on any device.
+// gradient recipe, so the same wallpaper can be rendered on any device.
 const LegacyTheme = z.strictObject({
   gradient: z.strictObject({
     start: color,
@@ -76,11 +67,11 @@ const LegacyTheme = z.strictObject({
   shape: z.int().min(0).max(0xffff_ffff),
 });
 
-export const EventTheme = z.union([PatternTheme, LegacyTheme]);
+export const EventTheme = z.union([WallpaperTheme, LegacyTheme]);
 
 export type EventThemeData = z.infer<typeof EventTheme>;
 
-export function patternFor(id: string, theme?: EventThemeData): Pattern {
+export function lookFor(id: string, theme?: EventThemeData): WallpaperLook {
   if (theme && 'pattern' in theme) return theme.pattern;
   const identity = theme
     ? `${id}:${theme.gradient.start}:${theme.gradient.end}:${theme.gradient.angle}:${theme.shape}`
@@ -89,7 +80,7 @@ export function patternFor(id: string, theme?: EventThemeData): Pattern {
   for (const character of identity)
     seed = Math.imul(seed ^ character.charCodeAt(0), 16777619) >>> 0;
   return {
-    kind: LEGACY_TEXTILE_KINDS[seed % LEGACY_TEXTILE_KINDS.length]!,
+    kind: 'printed-dots',
     seed,
   };
 }
