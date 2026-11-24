@@ -49,7 +49,7 @@ export const LOCALES: Record<Language, string> = {
   ar: 'ar',
   cs: 'cs-CZ',
   de: 'de-DE',
-  en: 'en-GB',
+  en: 'en-US',
   es: 'es-ES',
   'es-419': 'es-419',
   // Persian digits, but the Gregorian calendar the candidate days are in.
@@ -75,12 +75,17 @@ export const LOCALES: Record<Language, string> = {
   'zh-Hant': 'zh-TW',
 };
 
+/** The language tag used for page content and assistive technology. */
+export function documentLanguage(language: Language): string {
+  return language === 'en' ? LOCALES.en : language;
+}
+
 /** Each language as it names itself, for the language picker. */
 export const LANGUAGE_NAMES: Record<Language, string> = {
   ar: 'العربية',
   cs: 'Čeština',
   de: 'Deutsch',
-  en: 'English',
+  en: 'English (US)',
   es: 'Español (España)',
   'es-419': 'Español (Latinoamérica)',
   fa: 'فارسی',
@@ -306,7 +311,7 @@ export const SERVER_TEXTS = {
     previewClosed: 'This poll is closed.',
     previewImageAlt: 'An owl holding a calendar',
     previewCalendarAlt:
-      'The days to choose from on a calendar, coloured by how many can make it',
+      'The days to choose from on a calendar, colored by how many can make it',
     previewMoreDays: (days: number): string =>
       `+ ${days} more ${pluralForm('en', days, { one: 'day', other: 'days' })}`,
     calendarNote: 'Chosen with Owl Be There',

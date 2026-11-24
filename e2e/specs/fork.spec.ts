@@ -13,7 +13,9 @@ test('the public home is only the saved events list and the header opens About',
     'Admin',
   ]);
   await expect(page.getByRole('contentinfo')).toHaveCount(0);
-  await expect(main).toHaveText('There are no events to book.');
+  await expect(main).toHaveText(
+    'Your event list is empty. Open a shared event link to mark when you’re free. The event will show up here the next time you visit in this browser.'
+  );
 
   const { id } = await createEvent(request);
   await page.goto(`/e/${id}`);
@@ -66,11 +68,11 @@ test('a participant link remembers one event and Admin alone can see and edit th
   const one = await createEvent(request, { title: 'Shared dinner' });
   const other = await createEvent(request, { title: 'Private event' });
   await page.goto('/');
-  await expect(page.getByText('There are no events to book.')).toBeVisible();
+  await expect(page.getByText('Your event list is empty.')).toBeVisible();
   await page.goto(`/e/${one.id}#admin=${one.adminToken}`);
   await expect(page).toHaveURL(new RegExp(`/e/${one.id}$`));
   await expect(
-    page.getByRole('heading', { name: 'Organiser tools' })
+    page.getByRole('heading', { name: 'Organizer tools' })
   ).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Share', exact: true })
@@ -87,9 +89,7 @@ test('a participant link remembers one event and Admin alone can see and edit th
   const otherContext = await browser.newContext();
   const newcomer = await otherContext.newPage();
   await newcomer.goto(new URL('/', page.url()).href);
-  await expect(
-    newcomer.getByText('There are no events to book.')
-  ).toBeVisible();
+  await expect(newcomer.getByText('Your event list is empty.')).toBeVisible();
   await otherContext.close();
 
   await unlockAdmin(page);
@@ -101,7 +101,7 @@ test('a participant link remembers one event and Admin alone can see and edit th
   ).toHaveText('Private event');
   await manage.click();
   await expect(
-    page.getByRole('heading', { name: 'Organiser tools' })
+    page.getByRole('heading', { name: 'Organizer tools' })
   ).toBeVisible();
   await page.getByRole('button', { name: 'Share', exact: true }).click();
   const share = await page
@@ -112,12 +112,12 @@ test('a participant link remembers one event and Admin alone can see and edit th
   await page.reload();
   await expect(page.getByLabel('Admin PIN')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Organiser tools' })
+    page.getByRole('heading', { name: 'Organizer tools' })
   ).toHaveCount(0);
 
   await request.delete(`/api/events/${one.id}`, {
     headers: { 'x-site-admin-token': one.adminToken },
   });
   await page.goto('/');
-  await expect(page.getByText('There are no events to book.')).toBeVisible();
+  await expect(page.getByText('Your event list is empty.')).toBeVisible();
 });

@@ -1,9 +1,8 @@
 import {
-  EMOJI_KEYS,
-  EMOJIS,
   LIMITS,
   maxISODate,
-  type EmojiKey,
+  patternFor,
+  type Pattern,
   type EventSnapshotData,
   type ISODate,
   type Mark,
@@ -49,6 +48,11 @@ import { clearSession } from '../lib/prefs.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
 import { CalendarGrid } from './CalendarGrid.tsx';
 import {
+  PatternPicker,
+  randomPatterns,
+  samePattern,
+} from './PatternPicker.tsx';
+import {
   ChevronEndIcon,
   LockIcon,
   NoteIcon,
@@ -61,7 +65,6 @@ import {
   Dialog,
   Field,
   Notice,
-  Select,
   TextArea,
   TextInput,
 } from './ui.tsx';
@@ -91,7 +94,51 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Where in the panel a message belongs: next to the control that caused it. */
-type Place = 'status' | 'details' | 'days' | 'people' | 'delete';
+type Place = 'status' | 'details' | 'pattern' | 'days' | 'people' | 'delete';
+
+function PatternForm({
+  current,
+  busy,
+  onEdit,
+  onSave,
+}: {
+  current: Pattern;
+  busy: boolean;
+  onEdit(): void;
+  onSave(pattern: Pattern): Promise<boolean>;
+}) {
+  const { t } = useI18n();
+  const [choices, setChoices] = useState(randomPatterns);
+  const [draft, setDraft] = useState<Pattern | null>(null);
+  const selected = draft ?? current;
+  return (
+    <div className="grid gap-4">
+      <PatternPicker
+        choices={choices}
+        selected={selected}
+        onRefresh={() => setChoices(randomPatterns())}
+        onSelect={(pattern) => {
+          setDraft(pattern);
+          onEdit();
+        }}
+        hideLabel
+      />
+      <Button
+        className="justify-self-start"
+        variant="primary"
+        disabled={busy || samePattern(selected, current)}
+        onClick={() => {
+          void onSave(selected).then((saved) => {
+            if (saved)
+              setDraft((latest) => (latest === selected ? null : latest));
+          });
+        }}
+      >
+        {t('theme.savePattern')}
+      </Button>
+    </div>
+  );
+}
 
 export function AdminPanel(props: AdminPanelProps) {
   const { data, store, adminToken } = props;
@@ -195,6 +242,23 @@ export function AdminPanel(props: AdminPanelProps) {
           }
         />
         {noticeAt('details')}
+      </Section>
+      <Section title={t('theme.pattern')}>
+        <PatternForm
+          current={patternFor(event.id, event.theme)}
+          busy={busy}
+          onEdit={clearMessage}
+          onSave={(pattern) =>
+            run('pattern', () =>
+              api.updateEvent(
+                event.id,
+                { theme: { version: 1, pattern } },
+                adminToken
+              )
+            )
+          }
+        />
+        {noticeAt('pattern')}
       </Section>
       <Section title={t('admin.days')}>
         <DaysEditor
@@ -397,24 +461,6 @@ function DetailsForm({
           />
         )}
       </Field>
-      {!event.theme && (
-        <Field label={t('create.emoji')}>
-          {({ id }) => (
-            <Select
-              id={id}
-              value={input.emoji}
-              onChange={(e) => edit({ emoji: e.target.value as EmojiKey })}
-              className="min-h-11 rounded-2xl border-2 border-line bg-surface ps-3"
-            >
-              {EMOJI_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {EMOJIS[key]} {t(`emoji.${key}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      )}
       <Field label={t('create.description')} hint={t('create.descriptionHint')}>
         {({ id, describedBy }) => (
           <TextArea

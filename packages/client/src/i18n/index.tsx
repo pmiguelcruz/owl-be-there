@@ -1,4 +1,4 @@
-import { isRtl, LOCALES, type Language } from '@owl/shared';
+import { documentLanguage, isRtl, LOCALES, type Language } from '@owl/shared';
 import {
   createContext,
   useContext,
@@ -122,7 +122,7 @@ export function I18nProvider({
     [state.language, locale]
   );
   useLayoutEffect(() => {
-    document.documentElement.lang = state.language;
+    document.documentElement.lang = documentLanguage(state.language);
     document.documentElement.dir = isRtl(state.language) ? 'rtl' : 'ltr';
   }, [state.language]);
   const value = useMemo<I18n>(

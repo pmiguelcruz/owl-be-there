@@ -111,10 +111,7 @@ async function sampleEvent(): Promise<string> {
       days: event.days,
       language: 'en',
       durationDays: 1,
-      theme: {
-        gradient: { start: '#52b9b8', end: '#9a69cf', angle: 25 },
-        shape: 98253,
-      },
+      theme: { version: 1, pattern: { kind: 'printed-dots', seed: 41 } },
     },
     { [ADMIN_HEADER]: token }
   );
@@ -266,7 +263,7 @@ try {
       const context = await browser.newContext({
         viewport: { width: 1280, height: 900 },
         deviceScaleFactor: 1.25,
-        locale: 'en-GB',
+        locale: 'en-US',
         colorScheme: theme,
       });
       await context.addInitScript((choice) => {

@@ -146,7 +146,10 @@ function Shell() {
   }
 
   return (
-    <div className="isolate flex min-h-dvh flex-col">
+    <div
+      data-event-page={eventPage || undefined}
+      className="isolate flex min-h-dvh flex-col"
+    >
       <Header />
       <main
         ref={mainRef}

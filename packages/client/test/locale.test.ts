@@ -6,11 +6,11 @@ const day = (locale: string) =>
   formatDay('2026-10-20', locale, { day: 'numeric', month: 'long' });
 
 describe('formattingLocale', () => {
-  it('follows the browser region for English', () => {
+  it('uses US English across browser regions', () => {
     expect(formattingLocale('en', ['en-US'])).toBe('en-US');
     expect(day(formattingLocale('en', ['en-US']))).toBe('October 20');
-    expect(day(formattingLocale('en', ['en-GB']))).toBe('20 October');
-    expect(day(formattingLocale('en', ['en-AU']))).toBe('20 October');
+    expect(day(formattingLocale('en', ['en-GB']))).toBe('October 20');
+    expect(day(formattingLocale('en', ['en-AU']))).toBe('October 20');
   });
 
   it('follows the browser region for German', () => {
@@ -19,7 +19,7 @@ describe('formattingLocale', () => {
   });
 
   it('skips tags of other languages and takes the first matching one', () => {
-    expect(formattingLocale('en', ['de-DE', 'fr-FR', 'en-US'])).toBe('en-US');
+    expect(formattingLocale('de', ['en-US', 'fr-FR', 'de-AT'])).toBe('de-AT');
   });
 
   it('falls back to LOCALES for a tag without a region, an empty list or junk', () => {

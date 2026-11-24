@@ -187,16 +187,13 @@ describe('pages', () => {
     expect(response.body.indexOf('og:title')).toBeLessThan(2048);
   });
 
-  it('shows the emoji as the tab icon and keeps it out of the title', async () => {
+  it('uses the event title and owl favicon for an event with a legacy icon', async () => {
     t = await testApp();
     const { id } = await createEvent(t.app, { title: 'Kick-off' });
     const body = (await t.app.inject({ method: 'GET', url: `/e/${id}` })).body;
     expect(body).toContain('<title>Kick-off · Owl Be There</title>');
-    // A link preview has no icon, so it keeps the emoji.
-    expect(body).toContain(
-      '<meta property="og:title" content="⚽ Kick-off" />'
-    );
-    expect(body).toContain(`<link rel="icon" href="${emojiIcon('⚽')}" />`);
+    expect(body).toContain('<meta property="og:title" content="Kick-off" />');
+    expect(body).toContain('<link rel="icon" href="/favicon.svg" />');
   });
 
   it('announces a chosen date in the event language and keeps answers out of public previews', async () => {
@@ -406,7 +403,7 @@ describe('pages', () => {
       );
     }
     const home = await t.app.inject({ method: 'GET', url: '/' });
-    expect(home.body).toContain('<html lang="en">');
+    expect(home.body).toContain('<html lang="en-US">');
     expect(home.body).toContain(
       '<link rel="canonical" href="https://owl.example.org/" />'
     );
@@ -572,7 +569,7 @@ describe('pages', () => {
     for (const url of ['/xx', '/no', '/DE', '/de/about']) {
       const response = await t.app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBe(404);
-      expect(response.body, url).toContain('<html lang="en">');
+      expect(response.body, url).toContain('<html lang="en-US">');
     }
   });
 
@@ -1132,7 +1129,7 @@ describe('page helpers', () => {
       '<html lang="de"><head><title>T</title></head><body><div id="root"><p>$& $1</p></div></body></html>'
     );
     expect(template.render('')).toBe(
-      '<html lang="en"><head></head><body><div id="root"></div></body></html>'
+      '<html lang="en-US"><head></head><body><div id="root"></div></body></html>'
     );
   });
 

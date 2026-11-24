@@ -59,10 +59,7 @@ for (const scheme of ['light', 'dark'] as const) {
     const { id, adminToken } = await createEvent(request, {
       minCount: 2,
       description: 'Bring a ball.',
-      theme: {
-        gradient: { start: '#f4696b', end: '#7279d3', angle: 40 },
-        shape: 71922,
-      },
+      theme: { version: 1, pattern: { kind: 'blossoms', seed: 71922 } },
     });
     await answer(
       request,
@@ -182,7 +179,7 @@ test('the app talks to nobody but its own server and breaks no CSP rule', async 
   await expect(page.locator('html')).toHaveAttribute('lang', 'fa');
   // Back to English, which the steps below speak: an address is a choice.
   await page.goto('/en');
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en-US');
   await openAsOrganiser(page, { id });
   await joinAs(page, 'Carla');
   await day(myCalendar(page), dayFromNow(4)).click();
@@ -200,7 +197,7 @@ test('an event page tells link previews its title, and the API is off limits to 
   const { id } = await createEvent(request, { title: 'Pub quiz' });
   const page = await request.get(`/e/${id}`);
   const html = await page.text();
-  expect(html).toContain('<meta property="og:title" content="⚽ Pub quiz" />');
+  expect(html).toContain('<meta property="og:title" content="Pub quiz" />');
   expect(html).toContain('<meta name="robots" content="noindex, nofollow" />');
   const robots = await request.get('/robots.txt');
   expect(await robots.text()).toContain('Disallow: /api/');

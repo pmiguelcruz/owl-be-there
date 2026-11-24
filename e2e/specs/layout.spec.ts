@@ -77,7 +77,7 @@ for (const language of LANGUAGES) {
     const fonts = watchFullCjkFonts(page);
 
     await page.goto(`/${language}`);
-    await expect(page.getByText('There are no events to book.')).toBeVisible();
+    await expect(page.getByText('Your event list is empty.')).toBeVisible();
     await check(page, language, `/${language}`);
 
     // Half a year: every month's name and weeks of one and two digits.

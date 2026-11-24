@@ -902,7 +902,7 @@ describe('texts', () => {
       'Bahasa Indonesia',
       'Čeština',
       'Deutsch',
-      'English',
+      'English (US)',
       'Español (España)',
       'Español (Latinoamérica)',
       'Français',
@@ -1118,10 +1118,10 @@ const DAY_RANGES: Record<Language, string[]> = {
     'Fr., 31. Dezember 2027 – So., 2. Januar 2028',
   ],
   en: [
-    'Sat, 6 March 2027',
-    'Sat, 6 March – Sun, 7 March 2027',
-    'Sat, 6 March – Fri, 2 April 2027',
-    'Fri, 31 December 2027 – Sun, 2 January 2028',
+    'Sat, March 6, 2027',
+    'Sat, March 6 – Sun, March 7, 2027',
+    'Sat, March 6 – Fri, April 2, 2027',
+    'Fri, December 31, 2027 – Sun, January 2, 2028',
   ],
   es: [
     'sáb, 6 de marzo de 2027',

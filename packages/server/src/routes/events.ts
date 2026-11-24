@@ -404,6 +404,9 @@ export function registerEventRoutes(
             location: body.location || null,
           }),
           ...(body.emoji !== undefined && { emoji: body.emoji }),
+          ...(body.theme !== undefined && {
+            theme: JSON.stringify(body.theme),
+          }),
           ...(body.creatorName !== undefined && {
             creatorName: body.creatorName || null,
           }),

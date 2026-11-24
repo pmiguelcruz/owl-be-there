@@ -84,17 +84,17 @@ describe('PIN-protected event creation', () => {
     }
   });
 
-  it('validates the theme and persists its exact gradient and shape', async () => {
+  it('validates and persists the exact wallpaper recipe', async () => {
     const headers = await creationHeaders(t.app);
     const theme = {
-      gradient: { start: '#f4696b', end: '#7279d3', angle: 40 },
-      shape: 0xffffffff,
+      version: 1,
+      pattern: { kind: 'diamonds', seed: 0xffff_ffff },
     };
     for (const invalid of [
-      { ...theme, gradient: { ...theme.gradient, start: 'url(#elsewhere)' } },
-      { ...theme, gradient: { ...theme.gradient, angle: 360 } },
-      { ...theme, shape: -1 },
-      { ...theme, shape: 1.5 },
+      { ...theme, version: 2 },
+      { ...theme, pattern: { ...theme.pattern, kind: '<svg />' } },
+      { ...theme, pattern: { ...theme.pattern, seed: -1 } },
+      { ...theme, pattern: { ...theme.pattern, seed: 1.5 } },
     ]) {
       expect(
         (await create(headers, eventBody({ theme: invalid }))).statusCode

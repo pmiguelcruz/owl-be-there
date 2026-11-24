@@ -151,11 +151,11 @@ test.describe('painting days', () => {
     await expect(day(grid, D(6))).toHaveAttribute('data-state', 'none');
 
     await page.getByRole('radio', { name: 'Can' }).click();
-    const weekday = new Intl.DateTimeFormat('en-GB', {
+    const weekday = new Intl.DateTimeFormat('en-US', {
       weekday: 'long',
       timeZone: 'UTC',
     }).format(utcDateOf(D(6)));
-    const short = new Intl.DateTimeFormat('en-GB', {
+    const short = new Intl.DateTimeFormat('en-US', {
       weekday: 'short',
       timeZone: 'UTC',
     }).format(utcDateOf(D(6)));
@@ -242,7 +242,7 @@ test.describe('painting days', () => {
     // Enter leaves the field, which saves the note.
     await note.press('Enter');
     await expect(status).toHaveText(/^\s*Saved$/);
-    await expect(status).toHaveCSS('color', 'rgb(26, 112, 85)');
+    await expect(status).toHaveCSS('color', 'rgb(79, 179, 147)');
     const noteBox = await note.boundingBox();
     const statusBox = await status.boundingBox();
     expect(statusBox!.y).toBeGreaterThan(noteBox!.y + noteBox!.height);

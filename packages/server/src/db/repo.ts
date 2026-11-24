@@ -593,6 +593,7 @@ export interface EventPatch {
   description?: string | null;
   location?: string | null;
   emoji?: EmojiKey;
+  theme?: string;
   creatorName?: string | null;
   durationDays?: number;
   minCount?: number | null;
@@ -604,6 +605,7 @@ const COLUMNS: Record<Exclude<keyof EventPatch, 'days'>, string> = {
   description: 'description',
   location: 'location',
   emoji: 'emoji',
+  theme: 'theme',
   creatorName: 'creator_name',
   durationDays: 'duration_days',
   minCount: 'min_count',

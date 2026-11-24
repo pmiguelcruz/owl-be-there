@@ -1,9 +1,8 @@
 import {
   APP_NAME,
-  EMOJIS,
-  emojiIcon,
   formatDayRange,
   googleCalendarUrl,
+  patternFor,
   type EventSnapshotData,
 } from '@owl/shared';
 import {
@@ -99,14 +98,9 @@ export function EventPage({
   // Keep the title and favicon in step with the loaded event.
   const loaded = state.status === 'ready' ? state.data.event : null;
   useEffect(() => {
+    setFavicon(OWL_ICON);
     if (loaded) {
-      // The emoji is the tab's icon; in the title it would show twice.
       document.title = `${loaded.title} · ${APP_NAME}`;
-      setFavicon(
-        loaded.theme || loaded.emoji === 'owl'
-          ? OWL_ICON
-          : emojiIcon(EMOJIS[loaded.emoji])
-      );
     } else {
       // Not the title of the page this one replaced.
       document.title = `${APP_NAME} — ${t('app.tagline')}`;
@@ -225,12 +219,10 @@ function EventView(props: EventViewProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      {event.theme && (
-        <EventWallpaper
-          {...event.theme}
-          className="pointer-events-none fixed inset-0 -z-10 opacity-25"
-        />
-      )}
+      <EventWallpaper
+        pattern={patternFor(event.id, event.theme)}
+        className="pointer-events-none fixed inset-0 -z-10"
+      />
       <EventHeader
         data={data}
         onShare={adminToken ? () => props.onShare(true) : undefined}
@@ -314,9 +306,6 @@ function EventHeader({
     <header className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <h1 className="flex max-w-full min-w-0 flex-auto items-start gap-3 text-3xl leading-tight font-black sm:text-4xl">
-          {!event.theme && event.emoji !== 'owl' && (
-            <span aria-hidden="true">{EMOJIS[event.emoji]}</span>
-          )}
           <span dir="auto" className="min-w-0 break-words">
             {event.title}
           </span>

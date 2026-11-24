@@ -1,4 +1,4 @@
-import { EMOJIS, type EventViewData } from '@owl/shared';
+import { type EventViewData } from '@owl/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n/index.tsx';
 import { CopyIcon, ShareIcon } from './icons.tsx';
@@ -109,7 +109,7 @@ export function ShareDialog({
   const { t } = useI18n();
   const url = eventLink(publicUrl, event.id, window.location.origin);
   const invitation = t('share.inviteText', {
-    emoji: event.theme || event.emoji === 'owl' ? '' : EMOJIS[event.emoji],
+    emoji: '',
     title: isolateIfRtl(event.title),
     url,
   }).trimStart();

@@ -164,7 +164,7 @@ export async function saved(page: Page): Promise<void> {
 
 /** The heading of the organiser panel; present only with a working key. */
 export function organiserTools(page: Page): Locator {
-  return page.getByRole('heading', { name: 'Organiser tools' });
+  return page.getByRole('heading', { name: 'Organizer tools' });
 }
 
 export async function openAsOrganiser(
@@ -231,7 +231,10 @@ export async function expectLangAndDir(
   where: string
 ): Promise<void> {
   const html = page.locator('html');
-  await expect(html, `${where}: lang`).toHaveAttribute('lang', language);
+  await expect(html, `${where}: lang`).toHaveAttribute(
+    'lang',
+    language === 'en' ? 'en-US' : language
+  );
   await expect(html, `${where}: dir`).toHaveAttribute(
     'dir',
     ['ar', 'fa', 'ur'].includes(language) ? 'rtl' : 'ltr'

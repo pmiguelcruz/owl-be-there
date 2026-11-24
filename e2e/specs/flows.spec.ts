@@ -26,52 +26,26 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
 }) => {
   await startWizard(page);
   await page.getByLabel('Title').fill('Five-a-side');
-  const gradients = page.getByRole('group', { name: 'Gradients' });
-  const shapes = page.getByRole('group', { name: 'Wallpaper shapes' });
-  await expect(gradients.getByRole('radio')).toHaveCount(10);
-  await expect(shapes.getByRole('radio')).toHaveCount(5);
-  const originalColors = await gradients
-    .locator('stop')
-    .evaluateAll((stops) =>
-      stops.map((stop) => stop.getAttribute('stop-color'))
-    );
-  const originalPaths = await shapes
-    .locator('path')
-    .evaluateAll((paths) => paths.map((path) => path.getAttribute('d')));
-  await gradients.getByRole('button', { name: 'Refresh gradients' }).click();
-  await shapes.getByRole('button', { name: 'Refresh shapes' }).click();
-  expect(
-    await gradients
-      .locator('stop')
-      .evaluateAll((stops) =>
-        stops.map((stop) => stop.getAttribute('stop-color'))
-      )
-  ).not.toEqual(originalColors);
-  expect(
-    await shapes
-      .locator('path')
-      .evaluateAll((paths) => paths.map((path) => path.getAttribute('d')))
-  ).not.toEqual(originalPaths);
-  const chosenGradient = gradients.getByRole('radio', {
-    name: 'Gradient 3',
-    exact: true,
-  });
-  const chosenShape = shapes.getByRole('radio', {
-    name: 'Shape 2',
-    exact: true,
-  });
-  await chosenGradient.check();
-  await chosenShape.check();
-  const preview = page
-    .locator('svg')
-    .filter({ has: page.locator('pattern') })
-    .last();
-  const wallpaper = await preview.locator('pattern path').getAttribute('d');
-  const colors = await preview
-    .locator('stop')
-    .evaluateAll((stops) =>
-      stops.map((stop) => stop.getAttribute('stop-color'))
-    );
+  const picker = page.getByRole('group', { name: 'Wallpaper pattern' });
+  const options = picker.getByRole('radio');
+  const selected = picker.locator('figure [data-pattern]');
+  const recipes = () =>
+    picker
+      .locator('label [data-pattern]')
+      .evaluateAll((choices) =>
+        choices.map((choice) => choice.getAttribute('data-pattern'))
+      );
+  await expect(options).toHaveCount(10);
+  const original = await recipes();
+  expect(new Set(original).size).toBe(10);
+  await picker.getByRole('button', { name: 'Refresh patterns' }).click();
+  const refreshed = await recipes();
+  expect(new Set(refreshed).size).toBe(10);
+  expect(refreshed.every((recipe) => !original.includes(recipe))).toBe(true);
+  await expect(selected).toHaveAttribute('data-pattern', original[0]!);
+  await picker.getByRole('radio', { name: 'Pattern 3', exact: true }).check();
+  const wallpaper = refreshed[2]!;
+  await expect(selected).toHaveAttribute('data-pattern', wallpaper);
   await page.getByLabel('Place (optional)').fill('North field');
   await page.getByRole('button', { name: 'Next' }).click();
 
@@ -100,7 +74,7 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   // The canonical origin from PUBLIC_URL, not the 127.0.0.1 the test opened.
   expect(link).toMatch(/^http:\/\/localhost:\d+\/e\/[1-9A-HJ-NP-Za-km-z]{12}$/);
   await expect(
-    page.getByRole('textbox', { name: 'Your organiser link' })
+    page.getByRole('textbox', { name: 'Your organizer link' })
   ).toHaveCount(0);
   await expect(page.getByRole('img', { name: link })).toBeVisible();
   // One participant link and its QR code — and
@@ -120,32 +94,35 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await expect(
     page.getByRole('heading', { name: 'Five-a-side' })
   ).toBeVisible();
-  const eventWallpaper = page
-    .locator('main svg')
-    .filter({ has: page.locator('pattern') });
-  await expect(eventWallpaper.locator('pattern path')).toHaveAttribute(
-    'd',
-    wallpaper!
-  );
-  expect(
-    await eventWallpaper
-      .locator('stop')
-      .evaluateAll((stops) =>
-        stops.map((stop) => stop.getAttribute('stop-color'))
-      )
-  ).toEqual(colors);
+  const eventWallpaper = page.locator('[data-wallpaper="event"]');
+  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
 
-  await openAsOrganiser(page, {
-    id: new URL(page.url()).pathname.split('/').at(-1)!,
-  });
-  await expect(eventWallpaper.locator('pattern path')).toHaveAttribute(
-    'd',
-    wallpaper!
-  );
+  const id = new URL(page.url()).pathname.split('/').at(-1)!;
+  await openAsOrganiser(page, { id });
+  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  await page
+    .locator('details > summary')
+    .filter({ hasText: 'Wallpaper pattern' })
+    .click();
+  const editor = page.getByRole('group', { name: 'Wallpaper pattern' });
+  const preview = editor.locator('figure [data-pattern]');
+  await expect(preview).toHaveAttribute('data-pattern', wallpaper);
+  await editor.getByRole('radio', { name: 'Pattern 5', exact: true }).check();
+  const replacement = (await preview.getAttribute('data-pattern'))!;
+  await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  await page.getByRole('button', { name: 'Save pattern' }).click();
+  await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
   await expect(page.getByText('2 days in a row')).toBeVisible();
   expect(new URL(page.url()).hash).toBe('');
   await showView(page, 'mine');
   await expect(page.getByRole('button', { name: 'Anna' })).toBeVisible();
+
+  // Participants get the saved wallpaper with their registration view.
+  await page.goto(new URL(link).pathname);
+  await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  await expect(page.getByRole('button', { name: 'Save pattern' })).toHaveCount(
+    0
+  );
 });
 
 test('changing the range keeps the days the organiser already chose', async ({
@@ -197,7 +174,7 @@ test('changing the weekdays keeps the days the organiser already chose', async (
   const weekday = (iso: string) =>
     page.getByRole('button', {
       name: new RegExp(
-        `: ${new Intl.DateTimeFormat('en-GB', {
+        `: ${new Intl.DateTimeFormat('en-US', {
           weekday: 'long',
           timeZone: 'UTC',
         }).format(utcDateOf(iso))}$`
@@ -235,7 +212,7 @@ test('changing the weekdays keeps the days the organiser already chose', async (
   await expect(day(grid, D(11))).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('the tab shows the open event’s emoji once, and the owl elsewhere', async ({
+test('legacy icons give way to stable dark wallpapers and the owl favicon', async ({
   page,
   request,
 }) => {
@@ -244,26 +221,32 @@ test('the tab shows the open event’s emoji once, and the owl elsewhere', async
     title: 'Chess night',
     emoji: 'chess',
   });
-  const icon = () => page.locator('link[rel="icon"]').getAttribute('href');
-  const decoded = async () => decodeURIComponent((await icon()) ?? '');
-
-  // Both end up in "your events" on this device.
+  const icon = page.locator('link[rel="icon"]');
+  const wallpaper = page.locator('[data-wallpaper="event"]');
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`/e/${second.id}`);
   await expect(page).toHaveTitle('Chess night · Owl Be There');
+  await expect(wallpaper).toBeVisible();
+  const recipe = (await wallpaper.getAttribute('data-pattern'))!;
+  const darkMode = await page
+    .locator('html')
+    .evaluate((html) => getComputedStyle(html).colorScheme);
+  expect(darkMode).toBe('dark');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en-US');
   await page.goto(`/e/${first.id}`);
   await expect(page).toHaveTitle('Kick-off · Owl Be There');
-  expect(await decoded()).toContain('⚽');
+  await expect(icon).toHaveAttribute('href', '/favicon.svg');
+  await expect(wallpaper).not.toHaveAttribute('data-pattern', recipe);
+  await expect(page.getByRole('heading', { name: 'Kick-off' })).toHaveText(
+    'Kick-off'
+  );
 
-  // From here on the app changes pages without reloading.
   await page.getByRole('link', { name: 'Owl Be There' }).first().click();
   await expect(page.getByRole('list', { name: 'Your events' })).toBeVisible();
-  await expect.poll(icon).toBe('/favicon.svg');
-
   await page.getByRole('link', { name: /Chess night/ }).click();
   await expect(page).toHaveTitle('Chess night · Owl Be There');
-  await expect.poll(decoded).toContain('♟');
-  expect(await decoded()).not.toContain('⚽');
-  await expect(page.locator('link[rel="icon"]')).toHaveCount(1);
+  await expect(wallpaper).toHaveAttribute('data-pattern', recipe);
+  await expect(icon).toHaveAttribute('href', '/favicon.svg');
 });
 
 test('everything clickable shows the hand, and a disabled button does not', async ({
@@ -635,7 +618,7 @@ test('blocks of several days are ranked as blocks', async ({
   await showView(page, 'group');
   const first = page.locator('ol > li').first();
   await expect(first).toContainText('2 of 2 can');
-  const range = new Intl.DateTimeFormat('en-GB', {
+  const range = new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     timeZone: 'UTC',
   }).format(utcDateOf(D(7)));

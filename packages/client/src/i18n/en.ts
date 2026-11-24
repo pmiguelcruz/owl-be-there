@@ -23,7 +23,8 @@ const forkTexts = {
   'siteAdmin.events': 'All events',
   'siteAdmin.noEvents': 'No events yet.',
   'siteAdmin.unavailable': 'Admin is unavailable.',
-  'home.noEvents': 'There are no events to book.',
+  'home.noEvents':
+    'Your event list is empty. Open a shared event link to mark when you’re free. The event will show up here the next time you visit in this browser.',
   'home.eventsUnavailable': 'Could not load your events.',
   'who.ownerHint':
     'Add a password to open this entry again on another browser or after signing out.',
@@ -34,13 +35,11 @@ const forkTexts = {
   'admin.incorrect': 'Incorrect PIN.',
   'admin.expired':
     'Your admin session expired. Enter the PIN again to continue.',
-  'theme.gradients': 'Gradients',
-  'theme.shapes': 'Wallpaper shapes',
-  'theme.refreshGradients': 'Refresh gradients',
-  'theme.refreshShapes': 'Refresh shapes',
-  'theme.gradientOption': 'Gradient {number}',
-  'theme.shapeOption': 'Shape {number}',
-  'theme.preview': 'Wallpaper preview',
+  'theme.pattern': 'Wallpaper pattern',
+  'theme.refreshPatterns': 'Refresh patterns',
+  'theme.patternOption': 'Pattern {number}',
+  'theme.preview': 'Selected wallpaper',
+  'theme.savePattern': 'Save pattern',
 } as const;
 
 export const en = {
@@ -62,11 +61,11 @@ export const en = {
   'event.planOwn.title': 'Planning something yourself?',
   'event.planOwn.text': 'Start your own event in a minute, no account needed.',
   'home.myEvents': 'Your events',
-  'home.organiser': 'organiser',
+  'home.organiser': 'organizer',
   'home.forget': 'Remove {title} from this list',
   'home.forgetOrganiser.title': 'Remove this event from this device?',
   'home.forgetOrganiser.text':
-    'This device holds the organiser link for {title}. Removing the event also deletes that link here: without a copy of it you can no longer close the poll, pick the date or delete the event from this device.',
+    'This device holds the organizer link for {title}. Removing the event also deletes that link here: without a copy of it you can no longer close the poll, pick the date or delete the event from this device.',
   'home.forgetOrganiser.yes': 'Remove from this device',
   'home.creationDisabled': 'You can’t create new events here right now.',
 
@@ -74,7 +73,7 @@ export const en = {
   'create.step': 'Step {current} of {total}',
   'create.what': 'What is it?',
   'create.titleLabel': 'Title',
-  'create.titlePlaceholder': 'Football in the park',
+  'create.titlePlaceholder': 'Soccer in the park',
   'create.emoji': 'Icon',
   'create.description': 'Description (optional)',
   'create.descriptionHint': 'Links show up as text. You can’t click them.',
@@ -82,7 +81,7 @@ export const en = {
   'create.locationPlaceholder': 'North field',
   'create.creator': 'Your name (optional)',
   'create.creatorHint':
-    'Your name appears next to “organised by”. Add your own days later.',
+    'Your name appears next to “organized by”. Add your own days later.',
   'create.when': 'When could it be?',
   'create.from': 'From',
   'create.to': 'To',
@@ -148,13 +147,13 @@ export const en = {
     'It may have been deleted. Or the link may be incomplete.',
   'event.deleted': 'This event was deleted.',
   'event.stale': 'You’re seeing the last update. Reconnecting…',
-  'event.organisedBy': 'organised by {name}',
+  'event.organisedBy': 'organized by {name}',
   'event.duration_one': '{count} day',
   'event.duration_other': '{count} days in a row',
   'event.minCount_one': 'needs {count} person',
   'event.minCount_other': 'needs {count} people',
   'event.adminRefused':
-    'This organiser link was not accepted. The organiser tools are gone from this device; open the complete organiser link again to get them back.',
+    'This organizer link was not accepted. The organizer tools are gone from this device; open the complete organizer link again to get them back.',
   'event.expires':
     'This event will be deleted automatically on {date} unless something changes by then.',
   'event.share': 'Share',
@@ -272,11 +271,11 @@ export const en = {
   'share.qr': 'Scan to open',
   'share.inviteText':
     '{emoji} {title} — when can you make it? Add your days: {url}',
-  'share.adminTitle': 'Your organiser link',
+  'share.adminTitle': 'Your organizer link',
   'share.adminWarning':
     'Keep this link to yourself. Anyone with it can change or delete the event. Save it somewhere safe. You’ll need it to manage the event from another device.',
 
-  'admin.title': 'Organiser tools',
+  'admin.title': 'Organizer tools',
   'admin.close': 'Close the poll',
   'admin.reopen': 'Reopen the poll',
   'admin.unchoose': 'Undo the chosen date',
@@ -324,7 +323,7 @@ export const en = {
     'Owl Be There only stores what it needs to plan an event. Here’s what that is and when it gets deleted.',
   'privacy.stored.title': 'What is stored',
   'privacy.stored.event':
-    'For each event, we store its title, icon, possible days and settings. Description, place and organiser name are optional.',
+    'For each event, we store its title, icon, possible days and settings. Description, place and organizer name are optional.',
   'privacy.stored.person':
     'For each person, we store their name and marked days. We also store a note and password hash if they add them.',
   'privacy.stored.nothingElse':
@@ -337,7 +336,7 @@ export const en = {
     'Your browser stores opened events on this device. That includes your name in an event and your settings. You can remove events from the list on the start page.',
   'privacy.retention.title': 'When it is deleted',
   'privacy.retention.text':
-    'We delete an event {days} days after its last change. Once somebody has answered, it stays at least until its final day has passed. The organiser can delete it any time.',
+    'We delete an event {days} days after its last change. Once somebody has answered, it stays at least until its final day has passed. The organizer can delete it any time.',
   'privacy.logs_one':
     'The web server logs visits with IP addresses to prevent abuse. These logs are deleted after {count} day.',
   'privacy.logs_other':
@@ -369,13 +368,13 @@ export const en = {
     'There is no obligation and no willingness to take part in dispute resolution proceedings before a consumer arbitration board (§ 36 VSBG).',
   'imprint.liability.title': 'Liability for content and links',
   'imprint.liability.text':
-    'The content of this application was created with care. The respective provider is responsible for linked external sites; no legal violations were apparent when the links were set. The people who organise and take part in polls are themselves responsible for what they enter.',
+    'The content of this application was created with care. The respective provider is responsible for linked external sites; no legal violations were apparent when the links were set. The people who organize and take part in polls are themselves responsible for what they enter.',
 
   'notFound.title': 'We can’t find this page.',
   'notFound.home': 'Go to the start page',
 
   'emoji.owl': 'Owl',
-  'emoji.soccer': 'Football',
+  'emoji.soccer': 'Soccer',
   'emoji.basketball': 'Basketball',
   'emoji.volleyball': 'Volleyball',
   'emoji.handball': 'Handball',

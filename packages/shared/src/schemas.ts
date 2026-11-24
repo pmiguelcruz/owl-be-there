@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EventTheme } from './event-theme.js';
+import { EventTheme, PatternTheme } from './event-theme.js';
 import { isValidISODate } from './dates.js';
 import { DEFAULT_EMOJI, EMOJI_KEYS } from './emoji.js';
 import { ID_PATTERN } from './ids.js';
@@ -104,6 +104,7 @@ export const UpdateEventBody = z
     description: paragraph(LIMITS.description).nullable().optional(),
     location: line(LIMITS.location).nullable().optional(),
     emoji: Emoji.optional(),
+    theme: PatternTheme.optional(),
     creatorName: line(LIMITS.creatorName).nullable().optional(),
     durationDays: z.int().min(1).max(LIMITS.durationDays).optional(),
     minCount: z.int().min(1).max(LIMITS.participants).nullable().optional(),

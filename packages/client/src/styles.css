@@ -97,6 +97,7 @@
   }
 }
 
+:root:has([data-event-page]),
 :root[data-theme='dark'] {
   color-scheme: dark;
   --owl-bg: #16182b;

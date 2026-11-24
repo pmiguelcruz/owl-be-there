@@ -26,7 +26,7 @@ import {
 import { firstWeekdayFor, weekdayName, weekdayOrder } from '../lib/locale.ts';
 import { navigate } from '../lib/route.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
-import { randomGradients, randomShapes, ThemePicker } from './ThemePicker.tsx';
+import { PatternPicker, randomPatterns } from './PatternPicker.tsx';
 import { CalendarGrid } from './CalendarGrid.tsx';
 import { Button, Card, Field, Notice, TextArea, TextInput } from './ui.tsx';
 
@@ -53,10 +53,8 @@ export function CreateWizard({
 
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
-  const [gradients, setGradients] = useState(randomGradients);
-  const [shapes, setShapes] = useState(randomShapes);
-  const [gradientIndex, setGradientIndex] = useState(0);
-  const [shapeIndex, setShapeIndex] = useState(0);
+  const [patterns, setPatterns] = useState(randomPatterns);
+  const [pattern, setPattern] = useState(patterns[0]!);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [creatorName, setCreatorName] = useState('');
@@ -165,10 +163,7 @@ export function CreateWizard({
       const created = await api.createEvent(
         {
           title,
-          theme: {
-            gradient: gradients[gradientIndex]!,
-            shape: shapes[shapeIndex]!,
-          },
+          theme: { version: 1, pattern },
           language,
           durationDays: duration,
           days: candidates,
@@ -237,21 +232,11 @@ export function CreateWizard({
                 />
               )}
             </Field>
-            <ThemePicker
-              gradients={gradients}
-              shapes={shapes}
-              gradientIndex={gradientIndex}
-              shapeIndex={shapeIndex}
-              selectGradient={setGradientIndex}
-              selectShape={setShapeIndex}
-              refreshGradients={() => {
-                setGradients(randomGradients());
-                setGradientIndex(0);
-              }}
-              refreshShapes={() => {
-                setShapes(randomShapes());
-                setShapeIndex(0);
-              }}
+            <PatternPicker
+              choices={patterns}
+              onRefresh={() => setPatterns(randomPatterns())}
+              selected={pattern}
+              onSelect={setPattern}
             />
             <Field
               label={t('create.description')}

@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   APP_NAME,
-  EMOJIS,
-  emojiIcon,
+  documentLanguage,
   escapeMarkup,
   isRtl,
   LANGUAGES,
@@ -67,7 +66,7 @@ export class PageTemplate {
   render(head: string, language: Language = 'en', content = ''): string {
     const before = this.before.replace(
       /<html lang="[^"]*"/,
-      `<html lang="${language}"${isRtl(language) ? ' dir="rtl"' : ''}`
+      `<html lang="${documentLanguage(language)}"${isRtl(language) ? ' dir="rtl"' : ''}`
     );
     return `${before}${head}${this.data}${this.between}${content}${this.after}`;
   }
@@ -333,21 +332,18 @@ export function robotsTxt(publicUrl: string): string {
 export function eventHead(publicUrl: string, data: EventSnapshotData): string {
   const { event } = data;
   const texts = SERVER_TEXTS[event.language];
-  const emoji =
-    event.theme || event.emoji === 'owl' ? null : EMOJIS[event.emoji];
   const description = previewStatus(texts, data, LOCALES[event.language]);
   return head({
     publicUrl,
     path: `/e/${event.id}`,
-    // The tab shows the emoji as its icon; in the title it would appear twice.
     title: `${event.title} · ${APP_NAME}`,
-    ogTitle: emoji ? `${emoji} ${event.title}` : event.title,
+    ogTitle: event.title,
     description,
     // The version in the address: a changed poll is a new picture to caches
     // that keep one per URL.
     image: `${publicUrl}/e/${event.id}/og.png?v=${event.version}`,
     imageAlt: texts.previewCalendarAlt,
     noindex: true,
-    icon: emoji ? emojiIcon(emoji) : '/favicon.svg',
+    icon: '/favicon.svg',
   });
 }

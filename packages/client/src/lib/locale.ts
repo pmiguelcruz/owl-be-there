@@ -58,10 +58,9 @@ export function longWeekdayHeadings(locale: string): boolean {
 }
 
 /**
- * The locale the client formats dates and numbers in: the first of the
- * browser's tags that names the interface language and a region (`en-US`
- * reads "October 20", `en-AU` "20 October"), else the language's own entry in
- * `LOCALES`. A browser in another language (German, French interface) and a
+ * English uses US formatting. Other languages use the first of the browser's
+ * tags that names the interface language and a region or the language's
+ * entry in `LOCALES`. A browser in another language (German, French interface) and a
  * tag without a region fall through, as does a tag the interface language
  * does not own (`pt-BR` in the `pt` interface). The calendar stays Gregorian
  * and the digits those of `LOCALES[language]` (Persian for `fa`), whatever
@@ -72,6 +71,7 @@ export function formattingLocale(
   browser: readonly string[]
 ): string {
   const fallback = LOCALES[language];
+  if (language === 'en') return fallback;
   const wanted = new Intl.Locale(fallback);
   const digits = (tag: string): string | undefined =>
     new Intl.NumberFormat(tag).resolvedOptions().numberingSystem;
