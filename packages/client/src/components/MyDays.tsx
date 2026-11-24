@@ -296,7 +296,7 @@ function WhoAreYou({
                   {t('who.addPassword')}
                 </label>
                 <p id={`${formId}-protect-hint`} className="text-sm text-muted">
-                  {t('who.passwordHint')}
+                  {t('who.ownerHint')}
                 </p>
               </div>
             </div>

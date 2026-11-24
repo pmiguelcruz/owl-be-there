@@ -35,7 +35,7 @@ import {
   creationHeaders,
   eventBody,
   FakeClock,
-  TEST_ADMIN_PIN,
+  TEST_PIN_ENV,
   join as joinEvent,
   mark,
   setStatus,
@@ -362,7 +362,7 @@ describe('what a changed participant leaves in the files', () => {
     migrate(db);
     app = await buildApp({
       config: loadConfig({
-        ADMIN_PIN: TEST_ADMIN_PIN,
+        ...TEST_PIN_ENV,
         PUBLIC_URL: 'https://owl.example.org',
         RATE_LIMIT_MULTIPLIER: '1000',
       }),

@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import {
   charCount,
+  PARTICIPANT_HEADER,
   isId,
   LIMITS,
   makeId,
@@ -11,7 +12,7 @@ import {
   UpdateParticipantBody,
 } from '@owl/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { isAdmin, isParticipant } from '../auth/access.js';
+import { isAdmin, isParticipant, requireAdmin } from '../auth/access.js';
 import {
   assertPasswordCapacity,
   hashPassword,
@@ -20,6 +21,7 @@ import {
 import { signParticipantToken } from '../auth/tokens.js';
 import { limit, type AppContext } from '../context.js';
 import {
+  claimRosterEntry,
   deleteParticipant,
   findParticipantByKey,
   getDays,
@@ -35,6 +37,7 @@ import {
 import {
   ApiError,
   closed,
+  header,
   nameTaken,
   networkKey,
   notFound,
@@ -88,7 +91,7 @@ function authorize(
   event: EventRow,
   participant: ParticipantRow
 ): 'admin' | 'self' {
-  if (isAdmin(request, event)) return 'admin';
+  if (isAdmin(request, ctx)) return 'admin';
   if (!isParticipant(request, ctx.secret, event, participant)) {
     throw new ApiError(403, 'forbidden', 'Not your entry');
   }
@@ -149,18 +152,29 @@ export function registerParticipantRoutes(
   /**
    * "Who are you?" — a name, and a password if the name has one.
    *
-   * A new name becomes a participant. A known name without a password is
-   * simply that person again; given a password now, it becomes protected. A
-   * protected name needs its password.
+   * A new name creates an entry. A roster entry can be claimed once. An
+   * existing entry requires its browser token or password.
    */
   app.post<{ Params: { id: string } }>(
     '/api/events/:id/session',
     { config: limit(config, 10, '5 minutes') },
-    async (request) => {
+    async (request, reply) => {
+      reply.header('cache-control', 'no-store');
       const event = eventOr404(ctx, request.params.id);
       const body = parseBody(SessionBody, request.body);
       const key = nameKey(body.name);
       const existing = findParticipantByKey(ctx.db, event.id, key);
+      const ownsEntry =
+        existing &&
+        header(request, PARTICIPANT_HEADER) &&
+        isParticipant(request, ctx.secret, event, existing);
+      if (
+        existing &&
+        ownsEntry &&
+        body.password === undefined &&
+        existing.claimed
+      )
+        return joined(event, existing, false);
 
       if (existing?.password_hash != null) {
         if (body.password === undefined) {
@@ -202,9 +216,8 @@ export function registerParticipantRoutes(
       }
 
       const open = statusOf(event) === 'open';
-      if (existing && (body.password === undefined || !open)) {
-        return joined(event, existing, false);
-      }
+      if (existing?.claimed && !ownsEntry) throw nameTaken();
+      if (!open) throw closed();
       if (!existing) {
         if (!open) throw closed();
         assertRoom(ctx, event.id);
@@ -225,7 +238,17 @@ export function registerParticipantRoutes(
         const current = findParticipantByKey(ctx.db, event.id, key);
         if (current) {
           // Someone else protected the name, or created it, meanwhile.
-          if (current.password_hash !== null || !existing) throw nameTaken();
+          if (
+            current.password_hash !== null ||
+            !existing ||
+            current.id !== existing.id ||
+            (current.claimed &&
+              (!ownsEntry || current.token_gen !== existing.token_gen))
+          )
+            throw nameTaken();
+          claimRosterEntry(ctx.db, event.id, current.id);
+          if (passwordHash === null)
+            return { participant: current, created: false };
           return {
             participant: updateParticipant(
               ctx.db,
@@ -338,6 +361,7 @@ export function registerParticipantRoutes(
         // been removed or the name taken while scrypt ran.
         const now = getEvent(ctx.db, event.id);
         if (!now) throw notFound();
+        if (actor === 'admin') requireAdmin(request, ctx);
         if (actor === 'self' && statusOf(now) !== 'open') throw closed();
         const current = participantOr404(ctx, now, participant.id);
         // A token revoked while the password was hashed must not still write.

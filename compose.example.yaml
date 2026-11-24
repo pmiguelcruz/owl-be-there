@@ -13,8 +13,9 @@ services:
       # exactly that address and nothing else, so no other container on the
       # network can choose its own client address.
       TRUST_PROXY: 172.31.255.1
-      # 2. Set ADMIN_PIN in the local .env file to enable event creation.
-      ADMIN_PIN: ${ADMIN_PIN:-}
+      # 2. Set ADMIN_PIN_KEY in the local .env file to enable event creation.
+      ADMIN_PIN_KEY: ${ADMIN_PIN_KEY:-}
+      ADMIN_PIN_CIPHERTEXT: ${ADMIN_PIN_CIPHERTEXT:-}
     volumes:
       - ./data:/data
     # 3. Loopback only: Docker publishes ports past the host firewall, so a

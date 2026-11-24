@@ -1,3 +1,4 @@
+import { openAsOrganiser } from '../helpers.ts';
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
@@ -78,7 +79,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await startWizard(page);
     await expectAccessible(page, 'wizard');
 
-    await page.goto(`/e/${id}#admin=${adminToken}`);
+    await openAsOrganiser(page, { id, adminToken });
     await joinAs(page, 'Ben');
     await expectAccessible(page, 'my days');
     // Marked days have their own colours; check them too.
@@ -182,7 +183,7 @@ test('the app talks to nobody but its own server and breaks no CSP rule', async 
   // Back to English, which the steps below speak: an address is a choice.
   await page.goto('/en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   await joinAs(page, 'Carla');
   await day(myCalendar(page), dayFromNow(4)).click();
   await showView(page, 'group');
@@ -251,8 +252,7 @@ test('the 404 link and the Admin link look and behave like buttons: keyboard foc
 
   const { id } = await createEvent(request, { roster: ['Anna'] });
   await page.goto(`/e/${id}`);
-  await showView(page, 'mine');
-  await page.getByRole('button', { name: 'Anna' }).click();
+  await joinAs(page, 'Anna');
   await day(myCalendar(page), dayFromNow(5)).click();
   await saved(page);
   await expect(page.getByRole('main').getByText('Plan an event')).toHaveCount(

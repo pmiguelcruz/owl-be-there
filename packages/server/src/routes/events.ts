@@ -1,4 +1,4 @@
-import { CreationAccess } from '../auth/creation.js';
+import { z } from 'zod';
 import { randomInt } from 'node:crypto';
 import {
   addDays,
@@ -7,7 +7,8 @@ import {
   candidateBlocks,
   checkCandidateDays,
   AdminPinBody,
-  CREATION_HEADER,
+  ADMIN_HEADER,
+  PARTICIPANT_HEADER,
   CreateEventBody,
   isId,
   LIMITS,
@@ -22,9 +23,10 @@ import {
   UpdateEventBody,
   type ISODate,
 } from '@owl/shared';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { isAdmin } from '../auth/access.js';
-import { hashAdminToken, newAdminToken } from '../auth/tokens.js';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { isAdmin, requireAdmin } from '../auth/access.js';
+import { readParticipantToken } from '../auth/tokens.js';
+import { MAX_VISITS, rememberVisits, visitedIds } from '../auth/visits.js';
 import { limit, type AppContext } from '../context.js';
 import {
   addRoster,
@@ -34,6 +36,8 @@ import {
   findParticipantByKey,
   getDays,
   getEvent,
+  getParticipant,
+  eventDirectory,
   insertEvent,
   setStatus,
   snapshot,
@@ -63,12 +67,6 @@ export function eventOr404(ctx: AppContext, id: string): EventRow {
 export function assertRoom(ctx: AppContext, eventId: string, adding = 1): void {
   if (countParticipants(ctx.db, eventId) + adding > LIMITS.participants) {
     throw new ApiError(409, 'full', 'This event has no room for more people');
-  }
-}
-
-function requireAdmin(request: FastifyRequest, event: EventRow): void {
-  if (!isAdmin(request, event)) {
-    throw new ApiError(403, 'forbidden', 'This needs the organiser link');
   }
 }
 
@@ -134,7 +132,7 @@ function sendSnapshot(
 ): FastifyReply {
   const data = snapshot(ctx.db, id);
   if (!data) throw notFound();
-  return reply.header('cache-control', 'private, no-cache').send(data);
+  return reply.header('cache-control', 'private, no-store').send(data);
 }
 
 /** Tell the open streams that the event moved on. */
@@ -178,27 +176,14 @@ export function registerEventRoutes(
 ): void {
   const { config } = ctx;
   const ceiling = new HourlyCeiling();
-  const access = config.adminPin
-    ? new CreationAccess(ctx.secret, config.adminPin)
-    : null;
-
-  const requireCreationEnabled = () => {
-    if (!config.creationEnabled || !access) {
-      throw new ApiError(
-        503,
-        'creation_disabled',
-        'This instance does not take new events'
-      );
-    }
-    return access;
-  };
-
   app.post(
     '/api/admin/unlock',
     { config: limit(config, 5, '15 minutes') },
     async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      const policy = requireCreationEnabled();
+      const policy = ctx.admin;
+      if (!policy)
+        throw new ApiError(503, 'admin_disabled', 'Admin is unavailable');
       const { pin } = parseBody(AdminPinBody, request.body);
       const result = policy.unlock(pin, ctx.clock.now());
       if (result === 'limited') {
@@ -216,12 +201,65 @@ export function registerEventRoutes(
   );
 
   app.post(
+    '/api/admin/lock',
+    { config: limit(config, 60, '1 minute') },
+    async (request, reply) =>
+      reply
+        .header('cache-control', 'no-store')
+        .code(204)
+        .send(ctx.admin?.lock(header(request, ADMIN_HEADER)))
+  );
+
+  app.get(
+    '/api/admin/events',
+    { config: limit(config, 60, '1 minute') },
+    async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      requireAdmin(request, ctx);
+      return reply.send(eventDirectory(ctx.db));
+    }
+  );
+
+  app.get(
+    '/api/visited-events',
+    { config: limit(config, 120, '1 minute') },
+    async (request, reply) => {
+      return reply
+        .header('cache-control', 'private, no-store')
+        .send(eventDirectory(ctx.db, visitedIds(ctx, request)));
+    }
+  );
+
+  const ImportVisits = z.strictObject({
+    ids: z.array(z.string().refine(isId)).max(MAX_VISITS),
+  });
+  app.post(
+    '/api/visited-events',
+    { config: limit(config, 20, '1 minute') },
+    async (request, reply) => {
+      const { ids } = parseBody(ImportVisits, request.body);
+      const known = eventDirectory(ctx.db, ids).map((event) => event.id);
+      rememberVisits(ctx, request, reply, known);
+      return reply
+        .header('cache-control', 'private, no-store')
+        .code(204)
+        .send();
+    }
+  );
+
+  app.post(
     '/api/events',
     { config: limit(config, 10, '1 hour', 'creation_limit') },
     async (request, reply) => {
       reply.header('cache-control', 'no-store');
-      const policy = requireCreationEnabled();
-      if (!policy.allows(header(request, CREATION_HEADER), ctx.clock.now())) {
+      if (!config.creationEnabled || ctx.admin === null) {
+        throw new ApiError(
+          503,
+          'creation_disabled',
+          'This instance does not take new events'
+        );
+      }
+      if (!isAdmin(request, ctx)) {
         throw new ApiError(
           403,
           'creation_locked',
@@ -251,12 +289,11 @@ export function registerEventRoutes(
         throw new ApiError(503, 'capacity', 'This instance is full');
       }
       const id = makeId(randomInt);
-      const adminToken = newAdminToken();
       insertEvent(
         ctx.db,
         {
           id,
-          adminHash: hashAdminToken(adminToken),
+          adminHash: '', // Legacy column, ignored for access.
           title: body.title,
           description: body.description || null,
           location: body.location || null,
@@ -271,7 +308,7 @@ export function registerEventRoutes(
         },
         ctx.clock.now()
       );
-      return reply.code(201).send({ id, adminToken });
+      return reply.code(201).send({ id });
     }
   );
 
@@ -279,12 +316,45 @@ export function registerEventRoutes(
     '/api/events/:id',
     { config: limit(config, 600, '1 minute') },
     async (request, reply) => {
+      const admin = header(request, ADMIN_HEADER) !== undefined;
+      if (admin) requireAdmin(request, ctx);
       const event = eventOr404(ctx, request.params.id);
-      const etag = snapshotEtag(event.version);
-      reply.header('etag', etag).header('cache-control', 'private, no-cache');
+      const data = snapshot(ctx.db, event.id)!;
+      if (!admin && request.method === 'GET')
+        rememberVisits(ctx, request, reply, [event.id]);
+
+      const claim = readParticipantToken(
+        ctx.secret,
+        event.id,
+        header(request, PARTICIPANT_HEADER)
+      );
+      const participant =
+        claim && getParticipant(ctx.db, event.id, claim.participantId);
+      const ownId =
+        participant && participant.token_gen === claim?.generation
+          ? participant.id
+          : null;
+      const scope = admin ? '-admin' : ownId ? `-self-${ownId}` : '';
+      const etag = snapshotEtag(event.version, scope);
+      reply
+        .header('etag', etag)
+        .header(
+          'cache-control',
+          admin || ownId ? 'private, no-store' : 'private, no-cache'
+        )
+        .header('vary', `${ADMIN_HEADER}, ${PARTICIPANT_HEADER}`);
       if (matchesEtag(header(request, 'if-none-match'), etag))
         return reply.code(304).send();
-      return reply.send(snapshot(ctx.db, event.id));
+      return reply.send(
+        admin
+          ? data
+          : {
+              event: data.event,
+              participants: ownId
+                ? data.participants.filter((person) => person.id === ownId)
+                : [],
+            }
+      );
     }
   );
 
@@ -292,8 +362,8 @@ export function registerEventRoutes(
     '/api/events/:id',
     { config: limit(config, 60, '1 minute') },
     async (request, reply) => {
+      requireAdmin(request, ctx);
       const event = eventOr404(ctx, request.params.id);
-      requireAdmin(request, event);
       const body = parseBody(UpdateEventBody, request.body);
       const current = getDays(ctx.db, event.id).map((row) => row.day);
       const days = body.days ? normalizeDays(body.days) : current;
@@ -350,27 +420,12 @@ export function registerEventRoutes(
     }
   );
 
-  /**
-   * Whether the organiser key in the request is this event's. The client asks
-   * before it lets a key from a link replace the one it already holds, so a
-   * link with a made-up key cannot cost the organiser their access.
-   */
-  app.get<IdParams>(
-    '/api/events/:id/admin',
-    { config: limit(config, 30, '1 minute') },
-    async (request, reply) => {
-      const event = eventOr404(ctx, request.params.id);
-      requireAdmin(request, event);
-      return reply.code(204).send();
-    }
-  );
-
   app.put<IdParams>(
     '/api/events/:id/status',
     { config: limit(config, 60, '1 minute') },
     async (request, reply) => {
+      requireAdmin(request, ctx);
       const event = eventOr404(ctx, request.params.id);
-      requireAdmin(request, event);
       const body = parseBody(StatusBody, request.body);
       if (body.status === 'finalized') {
         const days = getDays(ctx.db, event.id).map((row) => row.day);
@@ -400,8 +455,8 @@ export function registerEventRoutes(
     '/api/events/:id',
     { config: limit(config, 60, '1 minute') },
     async (request, reply) => {
+      requireAdmin(request, ctx);
       const event = eventOr404(ctx, request.params.id);
-      requireAdmin(request, event);
       deleteEvent(ctx.db, event.id);
       ctx.hub.deleted(event.id);
       ctx.db.requestCheckpoint();
@@ -413,8 +468,8 @@ export function registerEventRoutes(
     '/api/events/:id/participants',
     { config: limit(config, 60, '1 minute') },
     async (request, reply) => {
+      requireAdmin(request, ctx);
       const event = eventOr404(ctx, request.params.id);
-      requireAdmin(request, event);
       const body = parseBody(RosterBody, request.body);
       // Names already there are skipped, so only the new ones count.
       const entries = rosterEntries(body.names).filter(

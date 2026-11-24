@@ -42,7 +42,7 @@ export function AboutPage() {
         </ul>
       </section>
       <div className="flex flex-wrap gap-4 border-t border-line pt-4">
-        <label className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center">
           <span className="font-bold">{t('footer.language')}</span>
           <Select
             className={selectClass}
@@ -59,7 +59,7 @@ export function AboutPage() {
             ))}
           </Select>
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center">
           <span className="font-bold">{t('footer.theme')}</span>
           <Select
             className={selectClass}

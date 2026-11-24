@@ -1,12 +1,19 @@
 import { ADMIN_HEADER, PARTICIPANT_HEADER } from '@owl/shared';
 import type { FastifyRequest } from 'fastify';
 import type { EventRow, ParticipantRow } from '../db/repo.js';
-import { header } from '../http.js';
-import { readParticipantToken, verifyAdminToken } from './tokens.js';
+import type { AppContext } from '../context.js';
+import { ApiError, header } from '../http.js';
+import { readParticipantToken } from './tokens.js';
 
-/** Whether the request carries the organiser's key to this event. */
-export function isAdmin(request: FastifyRequest, event: EventRow): boolean {
-  return verifyAdminToken(header(request, ADMIN_HEADER), event.admin_hash);
+export function isAdmin(request: FastifyRequest, ctx: AppContext): boolean {
+  return (
+    ctx.admin?.allows(header(request, ADMIN_HEADER), ctx.clock.now()) === true
+  );
+}
+
+export function requireAdmin(request: FastifyRequest, ctx: AppContext): void {
+  if (!isAdmin(request, ctx))
+    throw new ApiError(403, 'forbidden', 'Unlock Admin with the PIN');
 }
 
 /**

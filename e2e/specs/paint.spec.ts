@@ -1,3 +1,4 @@
+import { openAsOrganiser } from '../helpers.ts';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   createEvent,
@@ -507,7 +508,7 @@ test.describe('the tabs of a narrow screen', () => {
   }) => {
     await narrow(page);
     const { id } = await createEvent(request);
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await joinAs(page, 'Jonas');
     const cell = day(myCalendar(page), D(4));
     await context.setOffline(true);
@@ -539,7 +540,7 @@ test.describe('the tabs of a narrow screen', () => {
   }) => {
     await narrow(page);
     const { id } = await createEvent(request);
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await joinAs(page, 'Kai');
     const cell = day(myCalendar(page), D(4));
     await cell.click();
@@ -564,7 +565,7 @@ test.describe('the tabs of a narrow screen', () => {
   }) => {
     await narrow(page);
     const { id } = await createEvent(request);
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await showView(page, 'mine');
     const tabs = page.getByRole('tab');
     await expect(tabs).toHaveCount(2);
@@ -600,7 +601,7 @@ test.describe('the tabs of a narrow screen', () => {
     test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
     await narrow(page);
     const { id } = await createEvent(request);
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await showView(page, 'mine');
     const tabs = page.getByRole('tab');
     await tabs.first().focus();
@@ -651,7 +652,7 @@ test.describe('press feedback', () => {
   }, testInfo) => {
     test.skip(isMobile(testInfo), 'the press is checked with a mouse');
     const { id, adminToken } = await createEvent(request);
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await joinAs(page, 'Mara');
 
     // A day to paint, and a day of the group view, which opens a sheet.
@@ -667,11 +668,11 @@ test.describe('press feedback', () => {
     // Once the poll is closed no day can be painted: aria-disabled, not the
     // disabled attribute, says so, and the press must not suggest otherwise.
     const closed = await request.put(`/api/events/${id}/status`, {
-      headers: { 'x-admin-token': adminToken },
+      headers: { 'x-site-admin-token': adminToken },
       data: { status: 'closed' },
     });
     expect(closed.status()).toBe(200);
-    await page.reload();
+    await openAsOrganiser(page, { id });
     await showView(page, 'mine');
     await expect(myCalendar(page)).toHaveAttribute('aria-readonly', 'true');
     const inert = day(myCalendar(page), D(5));

@@ -1,3 +1,4 @@
+import { TEST_ADMIN_PIN } from '../scripts/test-pin.ts';
 import {
   expect,
   type APIRequestContext,
@@ -10,10 +11,13 @@ import { en } from '../packages/client/src/i18n/en.ts';
 // Read once per worker, so D(n) is the same day for the whole run even when it
 // crosses midnight UTC between creating an event and clicking its days.
 const BASE = Date.now();
-const TEST_ADMIN_PIN = '4182';
 
 export async function unlockAdmin(page: Page): Promise<void> {
   await page.getByRole('link', { name: 'Admin', exact: true }).click();
+  await enterPin(page);
+}
+
+async function enterPin(page: Page): Promise<void> {
   await page.getByLabel('Admin PIN').fill(TEST_ADMIN_PIN);
   await page.getByRole('button', { name: 'Unlock' }).click();
 }
@@ -53,13 +57,9 @@ export async function createEvent(
   request: APIRequestContext,
   overrides: Record<string, unknown> = {}
 ): Promise<CreatedEvent> {
-  const unlocked = await request.post('/api/admin/unlock', {
-    data: { pin: TEST_ADMIN_PIN },
-  });
-  expect(unlocked.status()).toBe(200);
-  const { token } = await unlocked.json();
+  const token = await adminSession(request);
   const response = await request.post('/api/events', {
-    headers: { 'x-creation-token': token },
+    headers: { 'x-site-admin-token': token },
     data: {
       title: 'Summer tournament',
       emoji: 'soccer',
@@ -70,7 +70,15 @@ export async function createEvent(
     },
   });
   expect(response.status()).toBe(201);
-  return response.json();
+  return { ...(await response.json()), adminToken: token };
+}
+
+async function adminSession(request: APIRequestContext): Promise<string> {
+  const unlocked = await request.post('/api/admin/unlock', {
+    data: { pin: TEST_ADMIN_PIN },
+  });
+  expect(unlocked.status()).toBe(200);
+  return (await unlocked.json()).token;
 }
 
 /**
@@ -99,7 +107,11 @@ export async function answer(
 }
 
 export async function snapshot(request: APIRequestContext, id: string) {
-  return (await request.get(`/api/events/${id}`)).json();
+  return (
+    await request.get(`/api/events/${id}`, {
+      headers: { 'x-site-admin-token': await adminSession(request) },
+    })
+  ).json();
 }
 
 /** Phones show the two views as tabs; wide screens show both at once. */
@@ -150,28 +162,18 @@ export async function saved(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-/** The local-storage key under which the client keeps an event's organiser key. */
-export function adminKeyName(id: string): string {
-  return `owl.admin.${id}`;
-}
-
-/** The organiser key the browser has stored for an event, or null. */
-export function storedAdminKey(page: Page, id: string): Promise<string | null> {
-  return page.evaluate((key) => localStorage.getItem(key), adminKeyName(id));
-}
-
 /** The heading of the organiser panel; present only with a working key. */
 export function organiserTools(page: Page): Locator {
   return page.getByRole('heading', { name: 'Organiser tools' });
 }
 
-/** Open an event with the organiser link and wait for the tools. */
 export async function openAsOrganiser(
   page: Page,
-  event: CreatedEvent
+  event: { id: string; adminToken?: string }
 ): Promise<void> {
-  await page.goto(`/e/${event.id}#admin=${event.adminToken}`);
-  await expect(organiserTools(page)).toBeVisible();
+  await page.goto(`/admin/events/${event.id}`);
+  await enterPin(page);
+  await expect(page.locator('main details > summary').first()).toBeVisible();
 }
 
 const EN_KEYS = Object.keys(en);

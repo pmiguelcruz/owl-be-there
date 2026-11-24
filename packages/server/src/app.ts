@@ -1,3 +1,4 @@
+import { AdminAccess } from './auth/admin.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import rateLimit from '@fastify/rate-limit';
@@ -238,6 +239,10 @@ export async function buildApp(
     config,
     db,
     secret,
+    admin:
+      config.adminPin === null
+        ? null
+        : new AdminAccess(secret, config.adminPin),
     clock,
     hub,
     template,

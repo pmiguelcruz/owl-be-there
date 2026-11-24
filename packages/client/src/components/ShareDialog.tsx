@@ -2,7 +2,7 @@ import { EMOJIS, type EventViewData } from '@owl/shared';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../i18n/index.tsx';
 import { CopyIcon, ShareIcon } from './icons.tsx';
-import { Button, Dialog, Notice } from './ui.tsx';
+import { Button, Dialog } from './ui.tsx';
 import { isolateIfRtl } from '../lib/bidi.ts';
 import { eventLink } from '../lib/links.ts';
 import { qrPath } from '../lib/qrPath.ts';
@@ -97,14 +97,12 @@ export function ShareDialog({
   open,
   onClose,
   event,
-  adminToken,
   justCreated,
   publicUrl,
 }: {
   open: boolean;
   onClose(): void;
   event: EventViewData;
-  adminToken: string | null;
   justCreated: boolean;
   publicUrl: string | null;
 }) {
@@ -140,15 +138,6 @@ export function ShareDialog({
         )}
         <CopyField label={t('share.link')} value={url} />
         <QrCode text={url} />
-        {adminToken && (
-          <div className="flex flex-col gap-3 rounded-2xl border-2 border-dashed border-line-strong p-4">
-            <CopyField
-              label={t('share.adminTitle')}
-              value={`${url}#admin=${adminToken}`}
-            />
-            <Notice>{t('share.adminWarning')}</Notice>
-          </div>
-        )}
       </div>
     </Dialog>
   );

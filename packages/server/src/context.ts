@@ -1,3 +1,4 @@
+import type { AdminAccess } from './auth/admin.js';
 import type { PasswordThrottle } from './auth/throttle.js';
 import type { Config } from './config.js';
 import type { Db } from './db/sqlite.js';
@@ -17,6 +18,7 @@ export interface AppContext {
   config: Config;
   db: Db;
   secret: Buffer;
+  admin: AdminAccess | null;
   clock: Clock;
   hub: SseHub;
   template: PageTemplate | null;

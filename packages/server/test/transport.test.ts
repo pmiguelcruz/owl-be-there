@@ -7,7 +7,7 @@ import { Db } from '../src/db/sqlite.js';
 import {
   createEvent,
   creationHeaders,
-  TEST_ADMIN_PIN,
+  TEST_PIN_ENV,
   sessionRequest,
   testApp,
   type TestApp,
@@ -77,7 +77,7 @@ async function listening(options: {
   logs?: string[];
 }) {
   const config = loadConfig({
-    ADMIN_PIN: TEST_ADMIN_PIN,
+    ...TEST_PIN_ENV,
     PUBLIC_URL: 'https://owl.example.org',
     LOG_LEVEL: options.logLevel ?? 'silent',
     RATE_LIMIT_MULTIPLIER: '1000',
@@ -187,7 +187,7 @@ describe('a request that stops arriving', () => {
 describe('logging a request the parser refuses', () => {
   const SECRET = 'SECRETADMINTOKEN0123456789';
   const request = (extra: string) =>
-    `PUT /api/events/AAAAAAAAAAAA/participants/BBBBBBBBBBBB/marks HTTP/1.1\r\nHost: x\r\nx-admin-token: ${SECRET}\r\n${extra}\r\n`;
+    `PUT /api/events/AAAAAAAAAAAA/participants/BBBBBBBBBBBB/marks HTTP/1.1\r\nHost: x\r\nx-site-admin-token: ${SECRET}\r\n${extra}\r\n`;
 
   it('leaves the raw bytes out of the log, even at trace', async () => {
     const logs: string[] = [];

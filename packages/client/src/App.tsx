@@ -1,5 +1,11 @@
 import { APP_NAME, hasImprint, LANGUAGE_NAMES } from '@owl/shared';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Owl } from './components/Owl.tsx';
 import { buttonClass, Notice } from './components/ui.tsx';
 import { I18nProvider, useI18n } from './i18n/index.tsx';
@@ -54,6 +60,7 @@ function Shell() {
   const instanceState = useInstance();
   const instance = instanceState.info;
   const [adminSession, setAdminSession] = useState<string | null>(null);
+  const clearAdmin = useCallback(() => setAdminSession(null), []);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
   // `/fr` reached by the back button or a link: the page follows the address,
@@ -74,14 +81,17 @@ function Shell() {
     route.page === 'imprint' && instance !== null && !hasImprint(instance)
       ? 'notFound.title'
       : headingKey(route);
+  const eventPage =
+    route.page === 'event' ||
+    (route.page === 'admin' && Boolean(route.id && adminSession));
   useEffect(() => {
-    if (route.page !== 'event') {
+    if (!eventPage) {
       document.title = heading
         ? `${t(heading)} · ${APP_NAME}`
         : `${APP_NAME} — ${t('app.tagline')}`;
       setFavicon(OWL_ICON);
     }
-  }, [route.page, heading, t]);
+  }, [eventPage, heading, t]);
 
   // A link swaps the page under the focus: move it along (not on first render).
   const mainRef = useRef<HTMLElement>(null);
@@ -111,7 +121,22 @@ function Shell() {
       page = <AboutPage />;
       break;
     case 'admin':
-      page = <AdminPage session={adminSession} setSession={setAdminSession} />;
+      page =
+        route.id && adminSession ? (
+          <EventPage
+            key={`admin:${route.id}`}
+            id={route.id}
+            publicUrl={instance?.publicUrl ?? null}
+            adminToken={adminSession}
+            onAdminLost={clearAdmin}
+          />
+        ) : (
+          <AdminPage
+            session={adminSession}
+            setSession={setAdminSession}
+            creationEnabled={instance?.creationEnabled !== false}
+          />
+        );
       break;
     case 'imprint':
       page = <ImprintPage instance={instanceState} />;

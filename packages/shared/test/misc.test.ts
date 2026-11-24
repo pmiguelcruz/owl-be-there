@@ -655,7 +655,9 @@ describe('the snapshot ETag', () => {
   });
 
   it('differs for every version', () => {
-    const etags = [0, 1, 2, 10, 11, 100].map(snapshotEtag);
+    const etags = [0, 1, 2, 10, 11, 100].map((version) =>
+      snapshotEtag(version)
+    );
     expect(new Set(etags).size).toBe(etags.length);
   });
 });

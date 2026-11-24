@@ -279,9 +279,10 @@ describe('the organiser', () => {
   });
 
   it('leaves version and the last write time alone when a PATCH changes nothing', async () => {
-    const { id, adminToken } = await createEvent(t.app, { title: 'Same' });
+    const { id } = await createEvent(t.app, { title: 'Same' });
     const before = getEvent(t.db, id)!;
     t.clock.advanceDays(30);
+    const adminToken = (await creationHeaders(t.app))['x-site-admin-token']!;
     const snapshot = await getSnapshot(t.app, id);
     for (const payload of [
       {},
@@ -343,8 +344,9 @@ describe('the organiser', () => {
   });
 
   it('keeps past days but refuses new ones in the past', async () => {
-    const { id, adminToken } = await createEvent(t.app);
+    const { id } = await createEvent(t.app);
     t.clock.advanceDays(10);
+    const adminToken = (await creationHeaders(t.app))['x-site-admin-token']!;
     const keep = await patchEvent(t.app, id, adminToken, {
       days: ['2027-03-05', '2027-03-20'],
       baseDays: ['2027-03-05', ...WEEKEND],

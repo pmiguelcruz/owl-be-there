@@ -1,17 +1,10 @@
-import {
-  EMOJI_KEYS,
-  isId,
-  LanguageSchema,
-  type EmojiKey,
-  type Language,
-} from '@owl/shared';
+import { isId, LanguageSchema, type Language } from '@owl/shared';
 import { z } from 'zod';
 import { browserBacking, Store } from './storage.ts';
 
 /**
  * Everything the browser remembers, and nothing the server does: the theme,
- * the language, who you are in each event, the organiser keys, and the list of
- * events on this device. All of it lives in localStorage under `owl.*`, and
+ * the language and who you are in each event. All of it lives in localStorage under `owl.*`, and
  * every read is checked against a schema.
  */
 const store = new Store(browserBacking());
@@ -68,92 +61,19 @@ export function storeSession(eventId: string, session: Session | null): void {
   else clearSession(eventId);
 }
 
-export function readAdminToken(eventId: string): string | null {
-  return store.read(`owl.admin.${eventId}`, z.string().min(20).max(128));
+/** Import the old browser-local event history once. Old admin keys are obsolete. */
+export function legacyVisitIds(): string[] {
+  const entries = store.read('owl.events', z.array(z.unknown())) ?? [];
+  const schema = z.object({ id: z.string().refine(isId) });
+  return entries
+    .flatMap((entry) => {
+      const parsed = schema.safeParse(entry);
+      return parsed.success ? [parsed.data.id] : [];
+    })
+    .slice(0, 40);
 }
 
-export function writeAdminToken(eventId: string, token: string): void {
-  store.write(`owl.admin.${eventId}`, token);
-}
-
-function removeAdminToken(eventId: string): void {
-  store.remove(`owl.admin.${eventId}`);
-}
-
-const MyEventSchema = z.object({
-  id: z.string().refine(isId),
-  title: z.string(),
-  emoji: z.enum(EMOJI_KEYS),
-  role: z.enum(['organiser', 'participant']),
-});
-
-export type MyEvent = z.infer<typeof MyEventSchema>;
-
-/** How many events the list on the start page keeps. */
-const MAX_MY_EVENTS = 50;
-
-/**
- * The events on this device, most recently seen first. Entries are checked
- * one by one, so a single damaged entry costs that entry, not the list.
- */
-export function readMyEvents(): MyEvent[] {
-  const raw = store.read('owl.events', z.array(z.unknown())) ?? [];
-  return raw.flatMap((entry) => {
-    const parsed = MyEventSchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
-}
-
-/**
- * Remember an event on this device. An organiser stays an organiser even when
- * they later open the plain link; the list keeps the fifty most recent.
- */
-export function rememberEvent(
-  event: { id: string; title: string; emoji: EmojiKey },
-  role: MyEvent['role']
-): void {
-  const existing = readMyEvents();
-  const previous = existing.find((entry) => entry.id === event.id);
-  const entry: MyEvent = {
-    id: event.id,
-    title: event.title,
-    emoji: event.emoji,
-    role: previous?.role === 'organiser' ? 'organiser' : role,
-  };
-  const list = [entry, ...existing.filter((other) => other.id !== event.id)];
-  store.write('owl.events', list.slice(0, MAX_MY_EVENTS));
-  // An entry pushed off the end can no longer be forgotten from the list, so
-  // its session and organiser key go with it.
-  for (const dropped of list.slice(MAX_MY_EVENTS)) dropKeys(dropped.id);
-}
-
-function dropKeys(eventId: string): void {
-  clearSession(eventId);
-  removeAdminToken(eventId);
-}
-
-/**
- * Drop an organiser key the server has refused, and the "organiser" label the
- * start page keeps for the event; the list entry and the session stay.
- */
-export function clearAdminToken(eventId: string): void {
-  removeAdminToken(eventId);
-  const events = readMyEvents();
-  if (events.some((e) => e.id === eventId && e.role === 'organiser')) {
-    store.write(
-      'owl.events',
-      events.map((e) =>
-        e.id === eventId ? { ...e, role: 'participant' as const } : e
-      )
-    );
-  }
-}
-
-/** Forget an event entirely: the list entry, the session and the organiser key. */
-export function forgetEvent(eventId: string): void {
-  store.write(
-    'owl.events',
-    readMyEvents().filter((entry) => entry.id !== eventId)
-  );
-  dropKeys(eventId);
+export function clearLegacyVisits(): void {
+  for (const id of legacyVisitIds()) store.remove(`owl.admin.${id}`);
+  store.remove('owl.events');
 }

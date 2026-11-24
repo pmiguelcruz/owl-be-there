@@ -1,3 +1,4 @@
+import { TEST_ADMIN_PIN, TEST_PIN_ENV } from './test-pin.ts';
 /**
  * Capture a sample event in light and dark mode and regenerate the default
  * link preview. The sample exists only in the temporary screenshot database.
@@ -20,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
-  CREATION_HEADER,
+  ADMIN_HEADER,
   exampleSnapshot,
   PREVIEW_COLOURS,
   todayUTC,
@@ -80,8 +81,6 @@ async function waitForServer(failure: () => Error | null): Promise<void> {
   throw new Error('The server did not start');
 }
 
-const SCREENSHOT_PIN = '4182';
-
 async function postJson(
   path: string,
   body: unknown,
@@ -103,7 +102,7 @@ async function sampleEvent(): Promise<string> {
     anna: new Map(),
   });
   const { token } = await postJson('/api/admin/unlock', {
-    pin: SCREENSHOT_PIN,
+    pin: TEST_ADMIN_PIN,
   });
   const { id } = await postJson(
     '/api/events',
@@ -117,7 +116,7 @@ async function sampleEvent(): Promise<string> {
         shape: 98253,
       },
     },
-    { [CREATION_HEADER]: token }
+    { [ADMIN_HEADER]: token }
   );
   const path = `/api/events/${id}`;
   for (const person of participants) {
@@ -150,7 +149,9 @@ async function shoot(
   id: string,
   theme: 'light' | 'dark'
 ): Promise<void> {
-  await page.goto(`${base}/e/${id}`);
+  await page.goto(`${base}/admin/events/${id}`);
+  await page.getByLabel('Admin PIN').fill(TEST_ADMIN_PIN);
+  await page.getByRole('button', { name: 'Unlock' }).click();
   await page.getByRole('grid', { name: 'Group' }).waitFor();
   await page.mouse.move(0, 0);
   const path = join(outDir, `screenshot-${theme}.png`);
@@ -230,7 +231,7 @@ const server = spawn('node', ['packages/server/dist/index.js'], {
     DATA_DIR: dataDir,
     LOG_LEVEL: 'warn',
     CREATION_ENABLED: 'true',
-    ADMIN_PIN: SCREENSHOT_PIN,
+    ...TEST_PIN_ENV,
   },
 });
 

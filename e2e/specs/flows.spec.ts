@@ -1,19 +1,19 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   greeting,
-  adminKeyName,
   answer,
   createEvent,
   day,
   dayFromNow,
   groupCalendar,
   isMobile,
+  joinAs,
+  saved,
   myCalendar,
   openAsOrganiser,
   organiserTools,
   showView,
   snapshot,
-  storedAdminKey,
   startWizard,
   unlockAdmin,
   utcDateOf,
@@ -101,16 +101,15 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   expect(link).toMatch(/^http:\/\/localhost:\d+\/e\/[1-9A-HJ-NP-Za-km-z]{12}$/);
   await expect(
     page.getByRole('textbox', { name: 'Your organiser link' })
-  ).toHaveValue(/#admin=/);
+  ).toHaveCount(0);
   await expect(page.getByRole('img', { name: link })).toBeVisible();
-  // The link for everyone, then the QR code, then the organiser's link — and
+  // One participant link and its QR code — and
   // no invitation text to copy; the system share sheet carries that.
   await expect(page.getByLabel('Invitation text')).toHaveCount(0);
   const top = async (locator: Locator) => (await locator.boundingBox())!.y;
   const order = [
     await top(page.getByRole('textbox', { name: 'Link for everyone' })),
     await top(page.getByRole('img', { name: link })),
-    await top(page.getByRole('textbox', { name: 'Your organiser link' })),
   ];
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   await page
@@ -136,7 +135,9 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
       )
   ).toEqual(colors);
 
-  await page.reload();
+  await openAsOrganiser(page, {
+    id: new URL(page.url()).pathname.split('/').at(-1)!,
+  });
   await expect(eventWallpaper.locator('pattern path')).toHaveAttribute(
     'd',
     wallpaper!
@@ -234,55 +235,6 @@ test('changing the weekdays keeps the days the organiser already chose', async (
   await expect(day(grid, D(11))).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('the organiser link is taken from the fragment and removed from the address', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await openAsOrganiser(page, { id, adminToken });
-  expect(new URL(page.url()).hash).toBe('');
-
-  // The stored key is asked about once on arrival, and the server's yes
-  // keeps the tools.
-  const checks: string[] = [];
-  page.on('request', (r) => {
-    if (r.url().endsWith(`/api/events/${id}/admin`))
-      checks.push(r.headers()['x-admin-token'] ?? '');
-  });
-  const checked = page.waitForResponse((response) =>
-    response.url().endsWith(`/api/events/${id}/admin`)
-  );
-  await page.reload();
-  expect((await checked).status()).toBe(204);
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-  expect(checks).toEqual([adminToken]);
-});
-
-test('a link with a made-up organiser key does not replace the real one', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await openAsOrganiser(page, { id, adminToken });
-
-  // A fresh page load, as when the link is opened from a message: from the
-  // event page itself, only the fragment would change and nothing reloads.
-  await page.goto('/');
-  // The stored key is checked on arrival as well; this waits for the link's.
-  const checked = page.waitForResponse(
-    (response) =>
-      response.url().endsWith(`/api/events/${id}/admin`) &&
-      response.request().headers()['x-admin-token'] === 'A'.repeat(43)
-  );
-  await page.goto(`/e/${id}#admin=${'A'.repeat(43)}`);
-  expect((await checked).status()).toBe(403);
-  expect(new URL(page.url()).hash).toBe('');
-  await page.reload();
-  await expect(organiserTools(page)).toBeVisible();
-  expect(await storedAdminKey(page, id)).toContain(adminToken);
-});
-
 test('the tab shows the open event’s emoji once, and the owl elsewhere', async ({
   page,
   request,
@@ -304,9 +256,7 @@ test('the tab shows the open event’s emoji once, and the owl elsewhere', async
 
   // From here on the app changes pages without reloading.
   await page.getByRole('link', { name: 'Owl Be There' }).first().click();
-  await expect(
-    page.getByRole('heading', { name: 'Your events' })
-  ).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Your events' })).toBeVisible();
   await expect.poll(icon).toBe('/favicon.svg');
 
   await page.getByRole('link', { name: /Chess night/ }).click();
@@ -333,10 +283,7 @@ test('everything clickable shows the hand, and a disabled button does not', asyn
 
   await page.goto(`/e/${id}`);
   await showView(page, 'mine');
-  expect(await cursor(page.getByRole('button', { name: 'Anna' }))).toBe(
-    'pointer'
-  );
-  await page.getByRole('button', { name: 'Anna' }).click();
+  await joinAs(page, 'Anna');
   expect(await cursor(day(myCalendar(page), D(5)))).toBe('pointer');
   // Nothing to undo yet: the button is disabled and says so.
   const undo = page.getByRole('button', { name: 'Undo' });
@@ -379,7 +326,7 @@ test('a select keeps its shape on focus and draws its own arrow', async ({
   });
 });
 
-test('two people see each other live, and the day sheet names them', async ({
+test('the admin sees participant updates live, and the day sheet names them', async ({
   browser,
   request,
 }) => {
@@ -387,12 +334,11 @@ test('two people see each other live, and the day sheet names them', async ({
   const one = await browser.newPage();
   const two = await browser.newPage();
   await one.goto(`/e/${id}`);
-  await two.goto(`/e/${id}`);
+  await openAsOrganiser(two, { id });
   await showView(two, 'group');
   await expect(two.getByText('No answers yet')).toBeVisible();
 
-  await showView(one, 'mine');
-  await one.getByRole('button', { name: 'Anna' }).click();
+  await joinAs(one, 'Anna');
   await day(myCalendar(one), D(5)).click();
 
   // Ben's page updates by itself.
@@ -544,13 +490,13 @@ test('the organiser removes a password only after confirming it', async ({
   const protectedEntry = async () =>
     (await snapshot(request, id)).participants[0].hasPassword;
 
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   await page.locator('summary', { hasText: 'People' }).click();
   await page.getByRole('button', { name: /^Maxi/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Maxi' });
   const unlock = dialog.getByRole('button', { name: 'Remove password' });
   await unlock.click();
-  await expect(dialog).toContainText('Anyone with the event link');
+  await expect(dialog).toContainText('This signs them out');
   // Cancel goes back to the person's actions, not out of the sheet.
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(unlock).toBeFocused();
@@ -573,7 +519,7 @@ test('a person’s row opens a sheet to fill in for them or remove them', async 
   const ben = (await snapshot(request, id)).participants.find(
     (p: { name: string }) => p.name === 'Ben'
   );
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   const people = await openSection(page, 'People');
   const annaRow = people.getByRole('button', { name: /^Anna/ });
   const benRow = people.getByRole('button', { name: /^Ben/ });
@@ -628,7 +574,7 @@ test('on a phone every row of the people list is as tall as the next', async ({
     headers: { 'x-participant-token': token },
     data: { password: 'secret-1', note: 'only after 6 pm' },
   });
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   const people = await openSection(page, 'People');
   // The rows' buttons: the last list item has no divider and is 1 px shorter.
   const rows = people.getByRole('list').getByRole('button');
@@ -645,38 +591,15 @@ test('the organiser chooses the best day; everyone gets a calendar file', async 
   page,
   request,
 }) => {
-  // Anna is on the roster, so a visitor starts on the list of names, where
-  // "Someone else" is the one way to add a new name.
-  const { id, adminToken } = await createEvent(request, {
-    roster: ['Anna'],
-    minCount: 2,
-  });
-  await answer(request, id, 'Anna', [D(6), D(7)]);
+  const { id, adminToken } = await createEvent(request, { minCount: 2 });
+  const visitor = await page.context().browser()!.newPage();
+  await visitor.goto(`/e/${id}`);
+  await joinAs(visitor, 'Anna');
+  await day(myCalendar(visitor), D(7)).click();
+  await saved(visitor);
   await answer(request, id, 'Ben', [D(7)], [D(6)]);
-  const visit = async () => {
-    const visitor = await page.context().browser()!.newPage();
-    await visitor.goto(`/e/${id}`);
-    await showView(visitor, 'mine');
-    // The list of names only: wide screens also show the group view, whose
-    // chips carry the same names.
-    const names = visitor
-      .getByRole('heading', { name: 'your name' })
-      .locator('..');
-    // A positive anchor first: a count of zero holds just as well while the
-    // page is still loading.
-    await expect(names.getByRole('button', { name: 'Anna' })).toBeVisible();
-    return { visitor, names };
-  };
 
-  // While the poll is open, a newcomer may add a name. This is what makes the
-  // absence below mean something.
-  const early = await visit();
-  await expect(
-    early.names.getByRole('button', { name: 'Someone else' })
-  ).toBeVisible();
-  await early.visitor.close();
-
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   await showView(page, 'group');
   const best = page
     .getByRole('listitem')
@@ -694,18 +617,11 @@ test('the organiser chooses the best day; everyone gets a calendar file', async 
   const data = await snapshot(request, id);
   expect(data.event).toMatchObject({ status: 'finalized', finalStart: D(7) });
 
-  // Nobody new can join, and a participant can no longer change their days.
-  const { visitor: other, names } = await visit();
-  await expect(names.getByRole('button', { name: 'Someone else' })).toHaveCount(
-    0
-  );
-  await names.getByRole('button', { name: 'Anna' }).click();
-  await expect(greeting(other, 'Anna')).toBeVisible();
-  await expect(myCalendar(other)).toHaveAttribute('aria-readonly', 'true');
+  await expect(myCalendar(visitor)).toHaveAttribute('aria-readonly', 'true');
   await expect(
-    other.getByText('The poll is closed. You can’t change your days now.')
+    visitor.getByText('The poll is closed. You can’t change your days now.')
   ).toBeVisible();
-  await other.close();
+  await visitor.close();
 });
 
 test('blocks of several days are ranked as blocks', async ({
@@ -715,7 +631,7 @@ test('blocks of several days are ranked as blocks', async ({
   const { id } = await createEvent(request, { durationDays: 2 });
   await answer(request, id, 'Anna', [D(6), D(7), D(8)]);
   await answer(request, id, 'Ben', [D(7), D(8)]);
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   await showView(page, 'group');
   const first = page.locator('ol > li').first();
   await expect(first).toContainText('2 of 2 can');
@@ -730,7 +646,7 @@ test('leaving someone out changes the count', async ({ page, request }) => {
   const { id } = await createEvent(request);
   await answer(request, id, 'Anna', [D(6)]);
   await answer(request, id, 'Ben', [D(6)]);
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   await showView(page, 'group');
   await expect(page.locator('ol > li').first()).toContainText('2 of 2 can');
   await page.getByRole('button', { name: 'Ben', exact: true }).click();
@@ -903,216 +819,13 @@ test('the count of answers is spelled out and follows live', async ({
 }) => {
   const { id } = await createEvent(request);
   await answer(request, id, 'Anna', [D(6)]);
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
+  await showView(page, 'group');
   await expect(page.locator('main')).toContainText('1 answer');
   await answer(request, id, 'Ben', [D(6)]);
   await expect(page.locator('main')).toContainText('2 answers', {
     timeout: 10_000,
   });
-});
-
-test('forgetting an event with an organiser key on this device asks first', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request, {
-    title: 'Garden party',
-  });
-  await openAsOrganiser(page, { id, adminToken });
-  await page.goto('/');
-  const forget = page.getByRole('button', {
-    name: 'Remove Garden party from this list',
-  });
-  const stored = () => storedAdminKey(page, id);
-
-  // Cancelling keeps the entry and the key.
-  await forget.click();
-  const dialog = page.getByRole('dialog', {
-    name: 'Remove this event from this device?',
-  });
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('organiser link');
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(forget).toBeVisible();
-  expect(await stored()).toContain(adminToken);
-
-  // Confirming removes both.
-  await forget.click();
-  await dialog.getByRole('button', { name: 'Remove from this device' }).click();
-  await expect(forget).toHaveCount(0);
-  expect(await stored()).toBeNull();
-});
-
-test('forgetting an event without an organiser key takes one tap', async ({
-  page,
-  request,
-}) => {
-  const { id } = await createEvent(request, { title: 'Book club' });
-  await page.goto(`/e/${id}`);
-  await expect(page.getByRole('heading', { name: 'Book club' })).toBeVisible();
-  await page.goto('/');
-  await page
-    .getByRole('button', { name: 'Remove Book club from this list' })
-    .click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(
-    page.getByRole('button', { name: 'Remove Book club from this list' })
-  ).toHaveCount(0);
-});
-
-const ADMIN_REFUSED = 'This organiser link was not accepted.';
-const MADE_UP_KEY = 'A'.repeat(43);
-
-/** Pastes an organiser link's fragment into the open page. */
-async function pasteOrganiserKey(page: Page, key: string): Promise<void> {
-  await page.evaluate((value) => {
-    window.location.hash = `#admin=${value}`;
-  }, key);
-}
-
-/**
- * Opens an event with a made-up organiser key, which a link whose key passes
- * the fragment check can leave on the device; the page asks the server about
- * it and is refused.
- */
-async function getRefused(page: Page, id: string): Promise<void> {
-  await page.goto(`/e/${id}#admin=${MADE_UP_KEY}`);
-  await expect(page.getByText(ADMIN_REFUSED)).toBeVisible();
-  await expect(organiserTools(page)).toHaveCount(0);
-}
-
-test('an organiser link pasted into the open event page is taken and removed from the address', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await page.goto(`/e/${id}`);
-  await expect(organiserTools(page)).toHaveCount(0);
-  await page.evaluate((key) => {
-    window.location.hash = `#admin=${key}`;
-  }, adminToken);
-  await expect(organiserTools(page)).toBeVisible();
-  expect(new URL(page.url()).hash).toBe('');
-  expect(await storedAdminKey(page, id)).toContain(adminToken);
-  // Nothing was refused before, so there is nothing to take back.
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-});
-
-test('the refused-link notice goes away when the complete link is pasted into the open page', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await getRefused(page, id);
-  expect(await storedAdminKey(page, id)).toBeNull();
-
-  await pasteOrganiserKey(page, adminToken);
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-  expect(new URL(page.url()).hash).toBe('');
-  expect(await storedAdminKey(page, id)).toContain(adminToken);
-
-  // The tools work again, and the notice does not come back with them.
-  // Save stays disabled while the day list is unchanged, so change a day first.
-  const days = await openSection(page, 'Days');
-  await day(days.getByRole('grid'), D(16)).click();
-  await days.getByRole('button', { name: 'Save' }).click();
-  await expect(days.getByText('Saved')).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-});
-
-test('a refused link pasted again keeps the notice, and a link that is no key does not take it back', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  const other = await createEvent(request, { title: 'Chess night' });
-  await getRefused(page, id);
-
-  // Too short to be a key: nothing is stored, the notice stays.
-  await pasteOrganiserKey(page, 'short');
-  await expect.poll(() => new URL(page.url()).hash).toBe('');
-  await expect(page.getByText(ADMIN_REFUSED)).toBeVisible();
-  await expect(organiserTools(page)).toHaveCount(0);
-  expect(await storedAdminKey(page, id)).toBeNull();
-
-  // Another key that is not this event's, one of another event included: it
-  // is asked about at once and refused, and the notice stays.
-  for (const key of ['B'.repeat(43), other.adminToken]) {
-    const checked = page.waitForResponse((response) =>
-      response.url().endsWith(`/api/events/${id}/admin`)
-    );
-    await pasteOrganiserKey(page, key);
-    expect((await checked).status()).toBe(403);
-    await expect(page.getByText(ADMIN_REFUSED)).toBeVisible();
-    await expect(organiserTools(page)).toHaveCount(0);
-    expect(await storedAdminKey(page, id)).toBeNull();
-  }
-
-  // The complete link then clears it for good.
-  await pasteOrganiserKey(page, adminToken);
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-});
-
-test('another event’s organiser link opens that event only; the notice stays out of it', async ({
-  page,
-  request,
-}) => {
-  const { id } = await createEvent(request);
-  const other = await createEvent(request, { title: 'Chess night' });
-  await getRefused(page, id);
-
-  // A fresh page load, as when the link is opened from a message.
-  await page.goto(`/e/${other.id}#admin=${other.adminToken}`);
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-
-  // The first event got no key from it.
-  await page.goto(`/e/${id}`);
-  await expect(
-    page.getByRole('heading', { name: 'Summer tournament' })
-  ).toBeVisible();
-  await expect(organiserTools(page)).toHaveCount(0);
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-  expect(await storedAdminKey(page, id)).toBeNull();
-});
-
-test('an organiser key kept on this device that the server no longer accepts is dropped on arrival', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await openAsOrganiser(page, { id, adminToken });
-
-  // The organiser link was issued anew elsewhere: the key here is dead.
-  await page.evaluate((key) => {
-    localStorage.setItem(key, JSON.stringify('C'.repeat(43)));
-  }, adminKeyName(id));
-  await page.reload();
-  await expect(page.getByText(ADMIN_REFUSED)).toBeVisible();
-  await expect(organiserTools(page)).toHaveCount(0);
-  expect(await storedAdminKey(page, id)).toBeNull();
-
-  // The current link brings the tools back.
-  await pasteOrganiserKey(page, adminToken);
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-});
-
-test('an organiser key kept on this device stays when it cannot be checked', async ({
-  page,
-  request,
-}) => {
-  const { id, adminToken } = await createEvent(request);
-  await openAsOrganiser(page, { id, adminToken });
-
-  await page.route(`**/api/events/${id}/admin`, (route) => route.abort());
-  await page.reload();
-  await expect(organiserTools(page)).toBeVisible();
-  await expect(page.getByText(ADMIN_REFUSED)).toHaveCount(0);
-  expect(await storedAdminKey(page, id)).toContain(adminToken);
 });
 
 /** One of the organiser's sections, opened. */
@@ -1131,7 +844,7 @@ test('the days editor saves only the days its calendar shows', async ({
   const { id, adminToken } = await createEvent(request, {
     days: [D(3), D(4), D(5)],
   });
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   const section = await openSection(page, 'Days');
   const until = section.getByLabel('Add days up to');
   // A far date typed first, then corrected to a near one: the days in between
@@ -1152,7 +865,7 @@ test('a day switched off in the days editor stays off when the end date moves on
   const { id, adminToken } = await createEvent(request, {
     days: [D(3), D(4), D(5)],
   });
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   const section = await openSection(page, 'Days');
   const grid = section.getByRole('grid');
   const until = section.getByLabel('Add days up to');
@@ -1190,14 +903,14 @@ test('saving days or a duration that takes answers or the date away asks first',
   });
   await answer(request, id, 'Anna', [D(7), D(8)]);
   const response = await request.put(`/api/events/${id}/status`, {
-    headers: { 'x-admin-token': adminToken },
+    headers: { 'x-site-admin-token': adminToken },
     data: { status: 'finalized', start: D(3) },
   });
   expect(response.status()).toBe(200);
   const current = async () => (await snapshot(request, id)).event;
   const dialog = page.getByRole('dialog');
 
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
   const days = await openSection(page, 'Days');
   await day(days.getByRole('grid'), D(8)).click();
   await days.getByRole('button', { name: 'Save' }).click();
@@ -1333,75 +1046,6 @@ test('a dialog that opens on arrival keeps focus, and closing it without an open
   expect(errors).toEqual([]);
 });
 
-/** Opens each event as its organiser, so the start page lists it as its own. */
-async function ownEvents(
-  page: Page,
-  request: Parameters<typeof createEvent>[0],
-  titles: string[]
-): Promise<void> {
-  for (const title of titles) {
-    const { id, adminToken } = await createEvent(request, { title });
-    await openAsOrganiser(page, { id, adminToken });
-  }
-}
-
-test('removing an event from the start page by keyboard never drops focus on the body', async ({
-  page,
-  request,
-}, testInfo) => {
-  test.skip(isMobile(testInfo), 'keyboards are a desktop thing');
-  await ownEvents(page, request, ['Alpha', 'Beta', 'Gamma']);
-  await page.goto('/');
-  const remove = (title: string) =>
-    page.getByRole('button', { name: `Remove ${title} from this list` });
-  const dialog = page.getByRole('dialog');
-  const links = page.locator('main li > a');
-  const open = async (title: string) => {
-    await remove(title).focus();
-    await page.keyboard.press('Enter');
-    await expect(dialog).toBeVisible();
-  };
-  const confirm = async () => {
-    await dialog
-      .getByRole('button', { name: 'Remove from this device' })
-      .focus();
-    await page.keyboard.press('Enter');
-  };
-
-  // Cancel and Escape give focus back to the button that opened the dialog.
-  await open('Beta');
-  await dialog.getByRole('button', { name: 'Cancel' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(dialog).toBeHidden();
-  await expect(remove('Beta')).toBeFocused();
-  await open('Beta');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(remove('Beta')).toBeFocused();
-
-  // Confirming removes the opener: focus moves to the entry in its place.
-  const before = await links.allTextContents();
-  const index = before.findIndex((text) => text.includes('Beta'));
-  await open('Beta');
-  await confirm();
-  await expect(remove('Beta')).toHaveCount(0);
-  const after = before.filter((_, at) => at !== index);
-  const expected = after[Math.min(index, after.length - 1)]!.includes('Alpha')
-    ? 'Alpha'
-    : 'Gamma';
-  await expect(page.locator('main li > a:focus')).toContainText(expected);
-
-  // The last entry hands focus to the one before it; with none left, to main.
-  await open('Alpha');
-  await confirm();
-  await expect(remove('Alpha')).toHaveCount(0);
-  await expect(page.locator('main li > a:focus')).toContainText('Gamma');
-  await open('Gamma');
-  await confirm();
-  await expect(links).toHaveCount(0);
-  await expect(page.locator('main')).toBeFocused();
-});
-
 test('confirming a save that costs answers moves focus into the organiser panel, and cancelling returns to Save', async ({
   page,
   request,
@@ -1413,14 +1057,14 @@ test('confirming a save that costs answers moves focus into the organiser panel,
   });
   await answer(request, id, 'Anna', [D(7), D(8)]);
   const chosen = await request.put(`/api/events/${id}/status`, {
-    headers: { 'x-admin-token': adminToken },
+    headers: { 'x-site-admin-token': adminToken },
     data: { status: 'finalized', start: D(3) },
   });
   expect(chosen.status()).toBe(200);
   const current = async () => (await snapshot(request, id)).event;
   const dialog = page.getByRole('dialog');
   const panel = organiserTools(page);
-  await page.goto(`/e/${id}#admin=${adminToken}`);
+  await openAsOrganiser(page, { id, adminToken });
 
   // Days: switch the last day off, which deletes Anna's answer for it.
   const days = await openSection(page, 'Days');

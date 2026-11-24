@@ -14,10 +14,19 @@ const forkTexts = {
   'about.storage':
     'Event details, names, notes and availability are stored on Pedro’s home server in Providence, Rhode Island, a repurposed A95X F2 TV box running Debian.',
   'about.sharing':
-    'Anyone with the event link can see the poll and its responses. This browser remembers your events and access keys.',
+    'Anyone with the event link can view the event and submit their own availability. A cookie remembers the links you have opened. This browser also saves access to your own entries.',
   'about.retention': 'Events are kept until someone manually deletes them.',
   'about.source': 'Source code',
   'siteAdmin.title': 'Admin',
+  'siteAdmin.clearPasswordConfirm':
+    'Remove the password for {name}? This signs them out and leaves their entry available to Admin.',
+  'siteAdmin.events': 'All events',
+  'siteAdmin.noEvents': 'No events yet.',
+  'siteAdmin.unavailable': 'Admin is unavailable.',
+  'home.noEvents': 'There are no events to book.',
+  'home.eventsUnavailable': 'Could not load your events.',
+  'who.ownerHint':
+    'Add a password to open this entry again on another browser or after signing out.',
   'admin.pin': 'Admin PIN',
   'admin.unlock': 'Unlock',
   'admin.lock': 'Lock',

@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { ADMIN_HEADER, CREATION_HEADER } from '@owl/shared';
+import { ADMIN_HEADER } from '@owl/shared';
 import type {
   FastifyInstance,
   InjectOptions,
@@ -13,7 +13,9 @@ import { Db } from '../src/db/sqlite.js';
 import type { ThrottleLimits } from '../src/auth/throttle.js';
 import type { StreamLimits } from '../src/sse.js';
 
-export const TEST_ADMIN_PIN = '4182';
+import { TEST_ADMIN_PIN, TEST_PIN_ENV } from '../../../scripts/test-pin.ts';
+
+export { TEST_ADMIN_PIN, TEST_PIN_ENV };
 
 export const CLIENT_DIR = fileURLToPath(
   new URL('./fixtures/client', import.meta.url)
@@ -50,7 +52,7 @@ export async function testApp(options: TestAppOptions = {}): Promise<TestApp> {
     PUBLIC_URL: 'https://owl.example.org',
     LOG_LEVEL: 'info',
     RATE_LIMIT_MULTIPLIER: '1000',
-    ADMIN_PIN: TEST_ADMIN_PIN,
+    ...TEST_PIN_ENV,
     ...(options.site !== false && { CLIENT_DIR }),
     ...options.env,
   });
@@ -96,33 +98,37 @@ export async function creationHeaders(
   });
   if (response.statusCode !== 200)
     throw new Error(`unlock failed: ${response.body}`);
-  return { [CREATION_HEADER]: response.json().token };
+  return { [ADMIN_HEADER]: response.json().token };
 }
 
 export async function createEvent(
   app: FastifyInstance,
   overrides: Record<string, unknown> = {}
 ): Promise<{ id: string; adminToken: string }> {
+  const headers = await creationHeaders(app);
   const response = await app.inject({
     method: 'POST',
     url: '/api/events',
-    headers: await creationHeaders(app),
+    headers,
     payload: eventBody(overrides),
   });
   if (response.statusCode !== 201)
     throw new Error(`create failed: ${response.body}`);
-  return response.json();
+  const { id } = await response.json<{ id: string }>();
+  return { id, adminToken: headers[ADMIN_HEADER]! };
 }
 
 export async function join(
   app: FastifyInstance,
   id: string,
   name: string,
-  password?: string
+  password?: string,
+  ownedToken?: string
 ): Promise<{ participantId: string; token: string; created: boolean }> {
   const response = await app.inject({
     method: 'POST',
     url: `/api/events/${id}/session`,
+    ...(ownedToken && { headers: { 'x-participant-token': ownedToken } }),
     payload: { name, ...(password !== undefined && { password }) },
   });
   if (response.statusCode !== 200)
@@ -151,6 +157,7 @@ export async function getSnapshot(app: FastifyInstance, id: string) {
   const response = await app.inject({
     method: 'GET',
     url: `/api/events/${id}`,
+    headers: await creationHeaders(app),
   });
   if (response.statusCode !== 200)
     throw new Error(`get failed: ${response.statusCode}`);

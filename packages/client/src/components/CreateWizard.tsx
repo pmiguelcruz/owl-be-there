@@ -1,7 +1,6 @@
 import {
   addDays,
   compareISODate,
-  DEFAULT_EMOJI,
   expandRange,
   forgetChangedWeekdays,
   isValidISODate,
@@ -25,7 +24,6 @@ import {
   parseRoster,
 } from '../lib/forms.ts';
 import { firstWeekdayFor, weekdayName, weekdayOrder } from '../lib/locale.ts';
-import { rememberEvent, writeAdminToken } from '../lib/prefs.ts';
 import { navigate } from '../lib/route.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
 import { randomGradients, randomShapes, ThemePicker } from './ThemePicker.tsx';
@@ -182,12 +180,7 @@ export function CreateWizard({
         },
         token
       );
-      writeAdminToken(created.id, created.adminToken);
-      rememberEvent(
-        { id: created.id, title: title.trim(), emoji: DEFAULT_EMOJI },
-        'organiser'
-      );
-      navigate(`/e/${created.id}`, { state: { created: true } });
+      navigate(`/admin/events/${created.id}`, { state: { created: true } });
     } catch (error) {
       if (error instanceof ApiFailure && error.code === 'creation_locked') {
         onLocked();

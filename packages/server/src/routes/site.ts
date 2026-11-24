@@ -3,6 +3,7 @@ import { join, relative, sep } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import { hasImprint, isId, LANGUAGES, type Language } from '@owl/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { rememberVisits } from '../auth/visits.js';
 import { limit, type AppContext } from '../context.js';
 import { snapshot } from '../db/repo.js';
 import { PreviewBusy } from '../preview.js';
@@ -121,7 +122,10 @@ export async function registerSite(
         page(reply, defaultHead(config.publicUrl, '/about'))
       );
     }
-    for (const url of withSlash('/admin')) {
+    for (const url of [
+      ...withSlash('/admin'),
+      ...withSlash('/admin/events/:id'),
+    ]) {
       app.get(url, async (_request, reply) => {
         reply.header('x-robots-tag', 'noindex, nofollow');
         return page(
@@ -155,12 +159,14 @@ export async function registerSite(
             ? snapshot(ctx.db, request.params.id)
             : null;
           reply.header('x-robots-tag', 'noindex, nofollow');
+          if (data && request.method === 'GET')
+            rememberVisits(ctx, request, reply, [data.event.id]);
           // The head carries the event's title: for the browser alone, not for
           // a cache that others share.
           return data
             ? page(
                 reply,
-                eventHead(config.publicUrl, data),
+                eventHead(config.publicUrl, { ...data, participants: [] }),
                 200,
                 data.event.language,
                 'private, no-cache'
@@ -192,7 +198,7 @@ export async function registerSite(
             .send({ error: 'not_found', message: 'No such event' });
         let png;
         try {
-          png = await ctx.preview!.render(data);
+          png = await ctx.preview!.render({ ...data, participants: [] });
         } catch (error) {
           if (!(error instanceof PreviewBusy)) throw error;
           return reply

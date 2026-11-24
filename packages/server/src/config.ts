@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { parseAddress } from '@owl/shared';
+import { FORK_PIN, openPin } from './auth/pin.js';
 
 /**
  * Everything the process reads from its environment, parsed once at start-up.
@@ -144,9 +145,15 @@ export function loadConfig(env: Env = process.env): Config {
     problems.push('OWL_SECRET must be at least 32 characters long');
   }
 
-  const adminPin = read(env, 'ADMIN_PIN');
-  if (adminPin !== null && !/^\d{4}$/.test(adminPin)) {
-    problems.push('ADMIN_PIN must be exactly four digits');
+  const adminPinKey = read(env, 'ADMIN_PIN_KEY');
+  const pinEnvelope = read(env, 'ADMIN_PIN_CIPHERTEXT') ?? FORK_PIN;
+  let adminPin: string | null = null;
+  if (adminPinKey !== null) {
+    try {
+      adminPin = openPin(adminPinKey, pinEnvelope);
+    } catch {
+      problems.push('ADMIN_PIN_KEY could not decrypt the configured admin PIN');
+    }
   }
 
   const imprintUrl = read(env, 'IMPRINT_URL');

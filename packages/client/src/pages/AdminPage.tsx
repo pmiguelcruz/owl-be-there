@@ -1,3 +1,5 @@
+import type { EventDirectoryData } from '@owl/shared';
+import { EventList } from '../components/EventList.tsx';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CreateWizard } from '../components/CreateWizard.tsx';
 import { Button, Card, Field, Notice, TextInput } from '../components/ui.tsx';
@@ -8,15 +10,44 @@ import { errorMessage } from '../lib/errors.ts';
 export function AdminPage({
   session,
   setSession,
+  creationEnabled,
 }: {
   session: string | null;
   setSession(session: string | null): void;
+  creationEnabled: boolean;
 }) {
   const { t } = useI18n();
   const [pin, setPin] = useState('');
   const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [directory, setDirectory] = useState<{
+    token: string;
+    events: EventDirectoryData;
+  } | null>(null);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!session || creating) return;
+    let active = true;
+    void api.adminEvents(session).then(
+      (events) => {
+        if (active) {
+          setDirectory({ token: session, events });
+          setDirectoryError(null);
+        }
+      },
+      (failure) => {
+        if (!active) return;
+        if (failure instanceof ApiFailure && failure.status === 403)
+          setSession(null);
+        else setDirectoryError(errorMessage(failure, t));
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [session, creating, setSession, t]);
+
   const focusStart = useRef(false);
   const start = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -41,9 +72,8 @@ export function AdminPage({
       setError(
         problem instanceof ApiFailure && problem.code === 'invalid_pin'
           ? t('admin.incorrect')
-          : problem instanceof ApiFailure &&
-              problem.code === 'creation_disabled'
-            ? t('home.creationDisabled')
+          : problem instanceof ApiFailure && problem.code === 'admin_disabled'
+            ? t('siteAdmin.unavailable')
             : errorMessage(problem, t)
       );
       requestAnimationFrame(() => input.current?.focus());
@@ -96,6 +126,7 @@ export function AdminPage({
         <div className="flex flex-wrap gap-3">
           <Button
             ref={start}
+            disabled={!creationEnabled}
             variant="primary"
             onClick={() => setCreating(true)}
           >
@@ -104,6 +135,7 @@ export function AdminPage({
           <Button
             onClick={() => {
               setSession(null);
+              void api.lockAdmin(session).catch(() => undefined);
               requestAnimationFrame(() => input.current?.focus());
             }}
           >
@@ -111,6 +143,17 @@ export function AdminPage({
           </Button>
         </div>
       )}
+      {session && !creating && directoryError && (
+        <Notice tone="error">{directoryError}</Notice>
+      )}
+      {session &&
+        !creating &&
+        directory?.token === session &&
+        (directory.events.length ? (
+          <EventList events={directory.events} admin />
+        ) : (
+          <p className="text-muted">{t('siteAdmin.noEvents')}</p>
+        ))}
       {creating && (
         <div hidden={!session}>
           <CreateWizard

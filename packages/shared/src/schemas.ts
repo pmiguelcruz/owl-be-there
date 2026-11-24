@@ -203,7 +203,17 @@ export const AdminPinBody = z.strictObject({
 
 export const AdminUnlockResponse = z.object({ token: z.string() });
 
-export const CreateEventResponse = z.object({ id: Id, adminToken: z.string() });
+export const CreateEventResponse = z.object({ id: Id });
+
+export const EventDirectory = z.array(
+  z.object({
+    id: Id,
+    title: z.string(),
+    status: EventStatus,
+  })
+);
+
+export type EventDirectoryData = z.infer<typeof EventDirectory>;
 
 export const SessionResponse = z.object({
   participantId: Id,

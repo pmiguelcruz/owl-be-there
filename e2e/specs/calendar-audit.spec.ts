@@ -1,3 +1,4 @@
+import { openAsOrganiser } from '../helpers.ts';
 import { expect, test } from '@playwright/test';
 import {
   createEvent,
@@ -37,7 +38,7 @@ test('past heat days say so, and the best ring is an outline in forced colours',
   request,
 }) => {
   const { id } = await createEvent(request);
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   await joinAs(page, 'Ira');
   await page.emulateMedia({ forcedColors: 'active' });
   const best = groupCalendar(page).locator('[data-best="true"]').first();

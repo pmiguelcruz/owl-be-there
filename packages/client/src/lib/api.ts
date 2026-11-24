@@ -1,7 +1,7 @@
 import {
   ADMIN_HEADER,
   AdminUnlockResponse,
-  CREATION_HEADER,
+  EventDirectory,
   ApiErrorBody,
   CreateEventResponse,
   EventSnapshot,
@@ -178,10 +178,30 @@ export const api = {
     });
   },
 
+  lockAdmin(token: string) {
+    return requestEmpty('POST', '/api/admin/lock', {
+      credentials: { admin: token },
+    });
+  },
+
+  adminEvents(token: string) {
+    return request('GET', '/api/admin/events', EventDirectory, {
+      credentials: { admin: token },
+    });
+  },
+
+  visitedEvents() {
+    return request('GET', '/api/visited-events', EventDirectory);
+  },
+
+  importVisits(ids: string[]) {
+    return requestEmpty('POST', '/api/visited-events', { body: { ids } });
+  },
+
   createEvent(body: CreateEventInput, token: string) {
     return request('POST', '/api/events', CreateEventResponse, {
       body,
-      headers: { [CREATION_HEADER]: token },
+      credentials: { admin: token },
     });
   },
 
@@ -192,12 +212,16 @@ export const api = {
    */
   async getEvent(
     id: string,
-    etag: string | null
+    etag: string | null,
+    credentials?: Credentials
   ): Promise<{ data: EventSnapshotData; etag: string | null } | null> {
     return exchange(
       'GET',
       events(id),
-      { ...(etag !== null && { headers: { 'if-none-match': etag } }) },
+      {
+        credentials,
+        ...(etag !== null && { headers: { 'if-none-match': etag } }),
+      },
       async (response) => {
         if (response.status === 304) return null;
         if (!response.ok) throw await failure(response);
@@ -327,18 +351,6 @@ export const api = {
     });
   },
 
-  /** Whether `admin` is this event's organiser key. */
-  async checkAdmin(id: string, admin: string): Promise<boolean> {
-    try {
-      await requestEmpty('GET', `${events(id)}/admin`, {
-        credentials: { admin },
-      });
-      return true;
-    } catch (failure) {
-      if (failure instanceof ApiFailure && failure.status === 403) return false;
-      throw failure;
-    }
-  },
   deleteEvent(id: string, admin: string) {
     return requestEmpty('DELETE', events(id), { credentials: { admin } });
   },

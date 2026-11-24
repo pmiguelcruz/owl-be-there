@@ -145,7 +145,10 @@ describe('event retention', () => {
       clock: t.clock,
     });
     try {
-      const response = await restarted.inject(`/api/events/${id}`);
+      const response = await restarted.inject({
+        url: `/api/events/${id}`,
+        headers: { 'x-participant-token': person.token },
+      });
       expect(response.statusCode).toBe(200);
       expect(response.json().event).not.toHaveProperty('expiresOn');
       expect(response.json().participants[0].yes).toEqual(WEEKEND);

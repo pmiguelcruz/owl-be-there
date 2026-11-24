@@ -1,5 +1,6 @@
 import { snapshotEtag, type EventSnapshotData } from '@owl/shared';
 import { api, ApiFailure, streamUrl } from './api.ts';
+import { readSession } from './prefs.ts';
 import { Observable } from './observable.ts';
 
 export type EventState =
@@ -50,9 +51,18 @@ export class EventStore extends Observable<EventState> {
   private catchUpMisses = 0;
   readonly id: string;
 
-  constructor(id: string) {
+  private readonly admin: string | null;
+  private readonly onAdminLost: (() => void) | undefined;
+
+  constructor(
+    id: string,
+    admin: string | null = null,
+    onAdminLost?: () => void
+  ) {
     super({ status: 'loading' });
     this.id = id;
+    this.admin = admin;
+    this.onAdminLost = onAdminLost;
   }
 
   start(): void {
@@ -86,6 +96,16 @@ export class EventStore extends Observable<EventState> {
     return this.fetching;
   }
 
+  refreshIdentity(): void {
+    const refresh = () => {
+      if (this.stopped) return;
+      this.etag = null;
+      void this.refresh();
+    };
+    if (this.fetching) void this.fetching.then(refresh);
+    else refresh();
+  }
+
   private async fetchOnce(): Promise<void> {
     let failed = false;
     try {
@@ -97,9 +117,23 @@ export class EventStore extends Observable<EventState> {
 
   /** One GET, applied to the state. Whether it failed. */
   private async fetchAndApply(): Promise<boolean> {
+    const participant = this.admin
+      ? null
+      : (readSession(this.id)?.token ?? null);
     try {
-      const result = await api.getEvent(this.id, this.etag);
-      if (this.stopped) return false;
+      const credentials = this.admin
+        ? { admin: this.admin }
+        : participant
+          ? { participant }
+          : undefined;
+      const result = credentials
+        ? await api.getEvent(this.id, this.etag, credentials)
+        : await api.getEvent(this.id, this.etag);
+      if (
+        this.stopped ||
+        (!this.admin && participant !== (readSession(this.id)?.token ?? null))
+      )
+        return false;
       if (result === null) {
         if (this.state.status === 'ready' && this.state.stale) {
           this.set({ ...this.state, stale: false });
@@ -110,6 +144,11 @@ export class EventStore extends Observable<EventState> {
       return false;
     } catch (error) {
       if (this.stopped) return false;
+      if (this.admin && error instanceof ApiFailure && error.status === 403) {
+        this.stop();
+        this.onAdminLost?.();
+        return false;
+      }
       // Only the API's own "no such event" means gone; a proxy's 404 page
       // is a failure like any other.
       if (
@@ -179,7 +218,10 @@ export class EventStore extends Observable<EventState> {
 
   /** Take a snapshot a write returned, if it is newer than what we show. */
   apply(data: EventSnapshotData): void {
-    this.accept(data, snapshotEtag(data.event.version));
+    this.accept(
+      data,
+      snapshotEtag(data.event.version, this.admin ? '-admin' : '')
+    );
   }
 
   /** The event was deleted by this browser. */

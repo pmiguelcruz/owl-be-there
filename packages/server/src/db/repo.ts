@@ -7,6 +7,7 @@ import {
   type EmojiKey,
   type EventStatusData,
   type EventSnapshotData,
+  type EventDirectoryData,
   type ISODate,
   type Language,
   type ParticipantViewData,
@@ -45,6 +46,7 @@ export interface ParticipantRow {
   name_key: string;
   source: 'roster' | 'self';
   password_hash: string | null;
+  claimed: 0 | 1;
   token_gen: number;
   note: string | null;
   marks_at: number | null;
@@ -76,6 +78,27 @@ export function countEvents(db: Db): number {
 
 export function getEvent(db: Db, id: string): EventRow | undefined {
   return db.get<EventRow>('SELECT * FROM events WHERE id = ?', id);
+}
+
+export function eventDirectory(
+  db: Db,
+  visited?: readonly string[]
+): EventDirectoryData {
+  if (visited !== undefined) {
+    return visited.flatMap((id) => {
+      const event = getEvent(db, id);
+      return event ? [{ id, title: event.title, status: statusOf(event) }] : [];
+    });
+  }
+  return db
+    .all<Pick<EventRow, 'id' | 'title' | 'closed_at' | 'final_start'>>(
+      'SELECT id, title, closed_at, final_start FROM events ORDER BY created_at DESC, rowid DESC'
+    )
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      status: statusOf(event),
+    }));
 }
 
 export function getDays(db: Db, eventId: string): DayRow[] {
@@ -357,8 +380,8 @@ export function insertParticipant(
 ): ParticipantRow {
   return db.tx(() => {
     db.run(
-      `INSERT INTO participants (id, event_id, name, name_key, source, password_hash, created_at)
-       VALUES (?, ?, ?, ?, 'self', ?, ?)`,
+      `INSERT INTO participants (id, event_id, name, name_key, source, password_hash, created_at, claimed)
+       VALUES (?, ?, ?, ?, 'self', ?, ?, 1)`,
       participant.id,
       eventId,
       participant.name,
@@ -369,6 +392,15 @@ export function insertParticipant(
     touch(db, eventId, now);
     return getParticipant(db, eventId, participant.id)!;
   });
+}
+
+/** Claim a roster entry once, in the same transaction as any password update. */
+export function claimRosterEntry(db: Db, eventId: string, id: string): void {
+  db.run(
+    'UPDATE participants SET claimed = 1 WHERE event_id = ? AND id = ?',
+    eventId,
+    id
+  );
 }
 
 /** Stamps before the first day the sender lacked, so it stays new; known days are a prefix by time. */

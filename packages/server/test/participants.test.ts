@@ -35,12 +35,12 @@ describe('who are you', () => {
   it('creates a participant for a new name, and finds them again by any spelling', async () => {
     const first = await join(t.app, id, 'Max');
     expect(first.created).toBe(true);
-    const again = await join(t.app, id, ' MAX ');
+    const again = await join(t.app, id, ' MAX ', undefined, first.token);
     expect(again).toMatchObject({
       participantId: first.participantId,
       created: false,
     });
-    // The same token on every device: signing in twice signs nobody out.
+    // The owner's current token also works across equivalent spellings.
     expect(again.token).toBe(first.token);
   });
 
@@ -62,7 +62,7 @@ describe('who are you', () => {
 
   it('lets someone protect an unprotected name, revoking older tokens', async () => {
     const before = await join(t.app, id, 'Max');
-    const after = await join(t.app, id, 'Max', 'secret-1');
+    const after = await join(t.app, id, 'Max', 'secret-1', before.token);
     expect(after.participantId).toBe(before.participantId);
     expect(after.token).not.toBe(before.token);
     expect((await mark(t.app, id, before, WEEKEND)).statusCode).toBe(403);
@@ -74,10 +74,16 @@ describe('who are you', () => {
       (await sessionRequest(t.app, id, { name: 'New', password: 'abc' })).json()
         .error
     ).toBe('password_too_short');
-    await join(t.app, id, 'Max');
+    const owner = await join(t.app, id, 'Max');
     expect(
-      (await sessionRequest(t.app, id, { name: 'Max', password: 'abc' })).json()
-        .error
+      (
+        await sessionRequest(
+          t.app,
+          id,
+          { name: 'Max', password: 'abc' },
+          { headers: { 'x-participant-token': owner.token } }
+        )
+      ).json().error
     ).toBe('password_too_short');
   });
 
@@ -89,10 +95,15 @@ describe('who are you', () => {
     });
     expect(emoji.statusCode).toBe(400);
     expect(emoji.json().error).toBe('password_too_short');
-    await join(t.app, id, 'Max');
+    const owner = await join(t.app, id, 'Max');
     expect(
       (
-        await sessionRequest(t.app, id, { name: 'Max', password: '😀😀😀' })
+        await sessionRequest(
+          t.app,
+          id,
+          { name: 'Max', password: '😀😀😀' },
+          { headers: { 'x-participant-token': owner.token } }
+        )
       ).json().error
     ).toBe('password_too_short');
     // Five characters are still too few, six are enough.
@@ -127,11 +138,18 @@ describe('who are you', () => {
   });
 
   it('lets known names in but takes no new ones once closed', async () => {
-    await join(t.app, id, 'Max');
+    const owner = await join(t.app, id, 'Max');
     await close();
-    expect((await sessionRequest(t.app, id, { name: 'Max' })).statusCode).toBe(
-      200
-    );
+    expect(
+      (
+        await sessionRequest(
+          t.app,
+          id,
+          { name: 'Max' },
+          { headers: { 'x-participant-token': owner.token } }
+        )
+      ).statusCode
+    ).toBe(200);
     const fresh = await sessionRequest(t.app, id, { name: 'Newcomer' });
     expect(fresh.statusCode).toBe(409);
     expect(fresh.json().error).toBe('closed');
@@ -178,7 +196,13 @@ describe('who are you', () => {
       const again = await join(t.app, full.id, 'p1');
       expect(again.created).toBe(false);
       // Protecting the name changes the entry, it does not add one.
-      const protectedName = await join(t.app, full.id, 'P1', 'secret-1');
+      const protectedName = await join(
+        t.app,
+        full.id,
+        'P1',
+        'secret-1',
+        again.token
+      );
       expect(protectedName).toMatchObject({
         participantId: again.participantId,
         created: false,
@@ -208,11 +232,16 @@ describe('who are you', () => {
   it('does not let a closed poll be used to protect a name', async () => {
     const max = await join(t.app, id, 'Max');
     await close();
-    const response = await sessionRequest(t.app, id, {
-      name: 'Max',
-      password: 'secret-1',
-    });
-    expect(response.json().token).toBe(max.token);
+    const response = await sessionRequest(
+      t.app,
+      id,
+      {
+        name: 'Max',
+        password: 'secret-1',
+      },
+      { headers: { 'x-participant-token': max.token } }
+    );
+    expect(response.json().error).toBe('closed');
     expect((await getSnapshot(t.app, id)).participants[0].hasPassword).toBe(
       false
     );
@@ -261,12 +290,16 @@ describe('who are you', () => {
       const jose = await join(t.app, id, 'Jos\u00E9');
       const zoe = await join(t.app, id, 'Zo\u00EB');
       for (const c of ['\u200D', '\u200C', '\uFE0F', '\u3164']) {
-        expect(await join(t.app, id, `Jose${c}\u0301`)).toMatchObject({
+        expect(
+          await join(t.app, id, `Jose${c}\u0301`, undefined, jose.token)
+        ).toMatchObject({
           participantId: jose.participantId,
           created: false,
         });
       }
-      expect(await join(t.app, id, 'Zoe\u200D\u0308')).toMatchObject({
+      expect(
+        await join(t.app, id, 'Zoe\u200D\u0308', undefined, zoe.token)
+      ).toMatchObject({
         participantId: zoe.participantId,
         created: false,
       });
@@ -1118,10 +1151,17 @@ describe('changing a participant', () => {
     await mark(t.app, id, max, ['2027-03-06'], ['2027-03-07']);
     t.clock.advanceDays(1);
     const days = (await getSnapshot(t.app, id)).event.days as string[];
-    await patchEvent(t.app, id, adminToken, {
-      days: [...days, '2027-03-08'],
-      baseDays: days,
-    });
+    const refreshed = await creationHeaders(t.app);
+    const changed = await patchEvent(
+      t.app,
+      id,
+      refreshed['x-site-admin-token']!,
+      {
+        days: [...days, '2027-03-08'],
+        baseDays: days,
+      }
+    );
+    expect(changed.statusCode).toBe(200);
     const response = await patchParticipant(
       t.app,
       id,
@@ -1143,13 +1183,9 @@ describe('changing a participant', () => {
     const ana = (await getSnapshot(t.app, id)).participants.find(
       (p: { name: string }) => p.name === 'Ana'
     );
-    const quiet = await patchParticipant(
-      t.app,
-      id,
-      ana.id,
-      adminHeaders(adminToken),
-      { note: 'x' }
-    );
+    const quiet = await patchParticipant(t.app, id, ana.id, refreshed, {
+      note: 'x',
+    });
     expect(quiet.statusCode).toBe(200);
     expect(await participantOf(t.app, id, ana.id)).toMatchObject({
       answered: false,
@@ -1258,9 +1294,9 @@ describe('changing a participant', () => {
     expect(
       (await participantOf(t.app, id, max.participantId)).hasPassword
     ).toBe(false);
-    expect((await sessionRequest(t.app, id, { name: 'Max' })).statusCode).toBe(
-      200
-    );
+    expect(
+      (await sessionRequest(t.app, id, { name: 'Max' })).json().error
+    ).toBe('name_taken');
   });
 
   it('deletes an entry, by its owner or the organiser', async () => {
@@ -1350,10 +1386,10 @@ describe('tokens revoked while a password is hashed', () => {
     expect(reset.statusCode).toBe(200);
     expect(login.statusCode).toBe(409);
     expect(login.json().error).toBe('changed');
-    // Without the reset, the same login is fine.
-    expect((await sessionRequest(t.app, id, { name: 'Ann' })).statusCode).toBe(
-      200
-    );
+    // Removing the password still does not make this name available to strangers.
+    expect(
+      (await sessionRequest(t.app, id, { name: 'Ann' })).json().error
+    ).toBe('name_taken');
   });
 
   it('let a login through when nothing changed', async () => {

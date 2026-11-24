@@ -12,35 +12,6 @@ test('starting the wizard moves focus into it and cancelling returns it to the s
   ).toBeFocused();
 });
 
-test('removing a list entry with one tap keeps focus in the list', async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'owl.events',
-      JSON.stringify([
-        {
-          id: 'aaaaaaaaaaaa',
-          title: 'One',
-          emoji: 'party',
-          role: 'participant',
-        },
-        {
-          id: 'bbbbbbbbbbbb',
-          title: 'Two',
-          emoji: 'party',
-          role: 'participant',
-        },
-      ])
-    );
-  });
-  await page.goto('/');
-  const remove = page.getByRole('button', { name: /One/ });
-  if ((await remove.count()) === 0) test.skip(true, 'storage key differs');
-  await remove.click();
-  await expect(page.locator('li > a:focus')).toHaveCount(1);
-});
-
 test('the About page fits instead of scrolling the page on a phone', async ({
   page,
 }) => {

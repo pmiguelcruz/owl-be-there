@@ -45,7 +45,7 @@ import {
   parseRoster,
   type DetailsValues,
 } from '../lib/forms.ts';
-import { forgetEvent } from '../lib/prefs.ts';
+import { clearSession } from '../lib/prefs.ts';
 import { holdReload } from '../lib/reloadGuard.ts';
 import { CalendarGrid } from './CalendarGrid.tsx';
 import {
@@ -155,7 +155,7 @@ export function AdminPanel(props: AdminPanelProps) {
   const deleteEvent = async () => {
     try {
       await api.deleteEvent(event.id, adminToken);
-      forgetEvent(event.id);
+      clearSession(event.id);
       store.markDeleted();
     } catch (failure) {
       setConfirmDelete(false);
@@ -831,7 +831,7 @@ function PersonSheet(props: {
               {t(
                 step === 'remove'
                   ? 'admin.removeConfirm'
-                  : 'admin.resetPasswordConfirm',
+                  : 'siteAdmin.clearPasswordConfirm',
                 { name: person.name }
               )}
             </p>

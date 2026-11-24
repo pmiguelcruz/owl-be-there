@@ -28,9 +28,9 @@ import {
 import { MyDays } from '../components/MyDays.tsx';
 import { EventWallpaper } from '../components/EventWallpaper.tsx';
 import { ShareDialog } from '../components/ShareDialog.tsx';
-import { Button, Notice } from '../components/ui.tsx';
+import { Button, Card, Notice } from '../components/ui.tsx';
 import { useI18n } from '../i18n/index.tsx';
-import { api, calendarFileUrl } from '../lib/api.ts';
+import { calendarFileUrl } from '../lib/api.ts';
 import { OWL_ICON, setFavicon } from '../lib/favicon.ts';
 import { isolate } from '../lib/bidi.ts';
 import { scrollToTop } from '../lib/motion.ts';
@@ -39,122 +39,53 @@ import { useEventStore } from '../hooks/useEventStore.ts';
 import type { EventStore } from '../lib/eventStore.ts';
 import { firstWeekdayFor } from '../lib/locale.ts';
 import { eventLink } from '../lib/links.ts';
-import { takeAdminTokenFromFragment } from '../lib/adminKey.ts';
-import {
-  clearAdminToken,
-  forgetEvent,
-  readAdminToken,
-  readSession,
-  rememberEvent,
-  storeSession,
-  writeAdminToken,
-  type Session,
-} from '../lib/prefs.ts';
+import { readSession, storeSession, type Session } from '../lib/prefs.ts';
 
 /** The look of the calendar-file and Google links under a decided event. */
 const RAISED_PILL =
   'inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-4 font-bold shadow-card';
 
+const noop = () => {};
+
 export function EventPage({
   id,
   publicUrl,
+  adminToken = null,
+  onAdminLost = noop,
 }: {
   id: string;
   publicUrl: string | null;
+  adminToken?: string | null;
+  onAdminLost?(): void;
 }) {
   const { t } = useI18n();
-  const { store, state } = useEventStore(id);
-  const [adminToken, setAdminToken] = useState(() => readAdminToken(id));
-  const [adminRefused, setAdminRefused] = useState(false);
-  // A fresh object per link, so the same link pasted again is checked again.
-  const [candidate, setCandidate] = useState<{ key: string } | null>(null);
-  // Why a key from the link was not taken up: the server said no, or could
-  // not be asked.
-  const [linkProblem, setLinkProblem] = useState<'refused' | 'offline' | null>(
-    null
-  );
-  // The key the server last accepted, so it is not asked about twice.
-  const verified = useRef<string | null>(null);
-
-  // The server refused the key: forget it here too, or the dead panel
-  // returns with the next visit.
-  const loseAdmin = useCallback(() => {
-    clearAdminToken(id);
-    setAdminToken(null);
-    setAdminRefused(true);
-  }, [id]);
-
-  // The organiser key in the address is taken on arrival and whenever the
-  // fragment changes: a link pasted into the open tab changes nothing else.
-  useEffect(() => {
-    const take = () => {
-      if (!window.location.hash.startsWith('#admin=')) return;
-      const taken = takeAdminTokenFromFragment(id);
-      if (taken !== null) setCandidate({ key: taken });
-      const stored = readAdminToken(id);
-      setAdminToken(stored);
-      // A refusal clears the stored key, so one stored now came from this link.
-      if (stored !== null) setAdminRefused(false);
-    };
-    take();
-    window.addEventListener('hashchange', take);
-    return () => window.removeEventListener('hashchange', take);
-  }, [id]);
-
-  // A key from the link that differs from the stored one replaces it only if
-  // the server says it is this event's.
-  useEffect(() => {
-    if (candidate === null) return;
-    let current = true;
-    setLinkProblem(null);
-    api
-      .checkAdmin(id, candidate.key)
-      .then((valid) => {
-        if (!current) return;
-        if (!valid) {
-          setLinkProblem('refused');
-          return;
-        }
-        verified.current = candidate.key;
-        writeAdminToken(id, candidate.key);
-        setAdminToken(candidate.key);
-        setAdminRefused(false);
-      })
-      .catch(() => {
-        if (current) setLinkProblem('offline');
-      });
-    return () => {
-      current = false;
-    };
-  }, [id, candidate]);
-
-  // A key kept on this device may have been replaced since, by a new
-  // organiser link: ask once before the first change fails with it. A failed
-  // request is no refusal; the panel stays until the server says no.
-  useEffect(() => {
-    if (adminToken === null || verified.current === adminToken) return;
-    let current = true;
-    api
-      .checkAdmin(id, adminToken)
-      .then((valid) => {
-        if (!current) return;
-        if (valid) verified.current = adminToken;
-        else loseAdmin();
-      })
-      .catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, [id, adminToken, loseAdmin]);
+  const { store, state } = useEventStore(id, adminToken, onAdminLost);
   const [session, setSession] = useState<Session | null>(() => readSession(id));
-  // Every change of the session is kept on this device and shown at once.
   const changeSession = useCallback(
     (next: Session | null) => {
+      const changed = readSession(id)?.token !== next?.token;
       storeSession(id, next);
       setSession(next);
+      if (changed) store.refreshIdentity();
     },
-    [id]
+    [id, store]
   );
+
+  useEffect(() => {
+    // Links issued by older versions may still carry a retired organizer key.
+    const strip = () => {
+      if (location.hash.startsWith('#admin=')) {
+        history.replaceState(
+          history.state,
+          '',
+          location.pathname + location.search
+        );
+      }
+    };
+    strip();
+    window.addEventListener('hashchange', strip);
+    return () => window.removeEventListener('hashchange', strip);
+  }, []);
   const [shareOpen, setShareOpen] = useState(() =>
     Boolean((window.history.state as { created?: boolean } | null)?.created)
   );
@@ -165,11 +96,10 @@ export function EventPage({
       window.history.replaceState(null, '', window.location.pathname);
   }, [justCreated]);
 
-  // Remember the event on this device once it has loaded.
+  // Keep the title and favicon in step with the loaded event.
   const loaded = state.status === 'ready' ? state.data.event : null;
   useEffect(() => {
     if (loaded) {
-      rememberEvent(loaded, adminToken ? 'organiser' : 'participant');
       // The emoji is the tab's icon; in the title it would show twice.
       document.title = `${loaded.title} · ${APP_NAME}`;
       setFavicon(
@@ -181,14 +111,13 @@ export function EventPage({
       // Not the title of the page this one replaced.
       document.title = `${APP_NAME} — ${t('app.tagline')}`;
     }
-  }, [loaded, adminToken, t]);
+  }, [loaded, t]);
 
-  // An event that is gone has no use for the entry in the list, the organiser
-  // key or the session kept for it.
+  // A removed event no longer needs a participant session.
   const gone = state.status === 'not-found' || state.status === 'deleted';
   useEffect(() => {
     if (!gone) return;
-    forgetEvent(id);
+    storeSession(id, null);
     // The emoji of an event that is no more would stay in the tab.
     setFavicon(OWL_ICON);
   }, [gone, id]);
@@ -214,9 +143,7 @@ export function EventPage({
       stale={state.stale}
       store={store}
       adminToken={adminToken}
-      onAdminLost={loseAdmin}
-      adminRefused={adminRefused}
-      linkProblem={linkProblem}
+      onAdminLost={onAdminLost}
       session={session}
       onSession={changeSession}
       shareOpen={shareOpen}
@@ -237,8 +164,6 @@ interface EventViewProps {
   store: EventStore;
   adminToken: string | null;
   onAdminLost(): void;
-  adminRefused: boolean;
-  linkProblem: 'refused' | 'offline' | null;
   session: Session | null;
   onSession(session: Session | null): void;
   shareOpen: boolean;
@@ -306,27 +231,27 @@ function EventView(props: EventViewProps) {
           className="pointer-events-none fixed inset-0 -z-10 opacity-25"
         />
       )}
-      <EventHeader data={data} onShare={() => props.onShare(true)} />
+      <EventHeader
+        data={data}
+        onShare={adminToken ? () => props.onShare(true) : undefined}
+      />
       {stale && <Notice>{t('event.stale')}</Notice>}
-      {props.adminRefused && (
-        <Notice tone="error">{t('event.adminRefused')}</Notice>
-      )}
-      {props.linkProblem && (
-        <Notice tone="error">
-          {props.linkProblem === 'offline'
-            ? t('error.offline')
-            : t('error.forbidden')}
-        </Notice>
-      )}
       <StatusBanner data={data} publicUrl={props.publicUrl} />
 
-      <EventViews
-        mine={mine}
-        group={group}
-        answered={answered}
-        tab={tab}
-        onTab={setTab}
-      />
+      {adminToken ? (
+        <EventViews
+          mine={mine}
+          group={group}
+          answered={answered}
+          tab={tab}
+          onTab={setTab}
+        />
+      ) : (
+        <Card>
+          <h2 className="mb-4 text-xl font-extrabold">{t('event.tabMine')}</h2>
+          {mine}
+        </Card>
+      )}
 
       {adminToken && (
         <AdminPanel
@@ -344,14 +269,15 @@ function EventView(props: EventViewProps) {
         />
       )}
 
-      <ShareDialog
-        open={props.shareOpen}
-        onClose={() => props.onShare(false)}
-        event={event}
-        adminToken={adminToken}
-        justCreated={props.justCreated}
-        publicUrl={props.publicUrl}
-      />
+      {adminToken && (
+        <ShareDialog
+          open={props.shareOpen}
+          onClose={() => props.onShare(false)}
+          event={event}
+          justCreated={props.justCreated}
+          publicUrl={props.publicUrl}
+        />
+      )}
     </div>
   );
 }
@@ -361,7 +287,7 @@ function EventHeader({
   onShare,
 }: {
   data: EventSnapshotData;
-  onShare(): void;
+  onShare: (() => void) | undefined;
 }) {
   const { t, tn } = useI18n();
   const { event } = data;
@@ -395,14 +321,16 @@ function EventHeader({
             {event.title}
           </span>
         </h1>
-        <Button
-          variant="primary"
-          onClick={onShare}
-          className="ms-auto shrink-0"
-        >
-          <ShareIcon />
-          <span>{t('event.share')}</span>
-        </Button>
+        {onShare && (
+          <Button
+            variant="primary"
+            onClick={onShare}
+            className="ms-auto shrink-0"
+          >
+            <ShareIcon />
+            <span>{t('event.share')}</span>
+          </Button>
+        )}
       </div>
       {meta.length > 0 && (
         <ul className="flex flex-wrap gap-2">

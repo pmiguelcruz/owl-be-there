@@ -299,7 +299,7 @@ describe('reads on the routes', () => {
     expect(all).not.toHaveBeenCalled();
   });
 
-  it('show a change at once', async () => {
+  it('show changes to admins while keeping marks out of the public preview', async () => {
     const { id } = await createEvent(t.app);
     const max = await join(t.app, id, 'Max');
     const before = (
@@ -310,7 +310,7 @@ describe('reads on the routes', () => {
     const after = (
       await t.app.inject({ method: 'GET', url: `/e/${id}/og.png` })
     ).rawPayload;
-    expect(after.equals(before)).toBe(false);
+    expect(after.equals(before)).toBe(true);
   });
 
   it('answer 404 for an unknown id and for a trailing slash', async () => {

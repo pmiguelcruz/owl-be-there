@@ -13,7 +13,7 @@ test('the public home is only the saved events list and the header opens About',
     'Admin',
   ]);
   await expect(page.getByRole('contentinfo')).toHaveCount(0);
-  await expect(main).toHaveText('');
+  await expect(main).toHaveText('There are no events to book.');
 
   const { id } = await createEvent(request);
   await page.goto(`/e/${id}`);
@@ -56,4 +56,68 @@ test('admin unlock rejects an incorrect PIN and a reload locks the page', async 
   await page.reload();
   await expect(action).toHaveCount(0);
   await expect(page.getByLabel('Admin PIN')).toBeVisible();
+});
+
+test('a participant link remembers one event and Admin alone can see and edit them all', async ({
+  browser,
+  page,
+  request,
+}) => {
+  const one = await createEvent(request, { title: 'Shared dinner' });
+  const other = await createEvent(request, { title: 'Private event' });
+  await page.goto('/');
+  await expect(page.getByText('There are no events to book.')).toBeVisible();
+  await page.goto(`/e/${one.id}#admin=${one.adminToken}`);
+  await expect(page).toHaveURL(new RegExp(`/e/${one.id}$`));
+  await expect(
+    page.getByRole('heading', { name: 'Organiser tools' })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Share', exact: true })
+  ).toHaveCount(0);
+  await page.getByLabel('Your name', { exact: true }).fill('Rita');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const calendar = page.getByRole('grid', { name: 'My days' });
+  await calendar.locator('[data-kind="day"]').first().click();
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Owl Be There' }).click();
+  await expect(
+    page.getByRole('list', { name: 'Your events' }).getByRole('link')
+  ).toHaveText(['Shared dinner']);
+  const otherContext = await browser.newContext();
+  const newcomer = await otherContext.newPage();
+  await newcomer.goto(new URL('/', page.url()).href);
+  await expect(
+    newcomer.getByText('There are no events to book.')
+  ).toBeVisible();
+  await otherContext.close();
+
+  await unlockAdmin(page);
+  const directory = page.getByRole('list', { name: 'All events' });
+  const manage = directory.locator(`a[href="/admin/events/${one.id}"]`);
+  await expect(manage).toHaveText('Shared dinner');
+  await expect(
+    directory.locator(`a[href="/admin/events/${other.id}"]`)
+  ).toHaveText('Private event');
+  await manage.click();
+  await expect(
+    page.getByRole('heading', { name: 'Organiser tools' })
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Share', exact: true }).click();
+  const share = await page
+    .getByRole('textbox', { name: 'Link for everyone' })
+    .inputValue();
+  expect(new URL(share).pathname).toBe(`/e/${one.id}`);
+  expect(new URL(share).hash).toBe('');
+  await page.reload();
+  await expect(page.getByLabel('Admin PIN')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Organiser tools' })
+  ).toHaveCount(0);
+
+  await request.delete(`/api/events/${one.id}`, {
+    headers: { 'x-site-admin-token': one.adminToken },
+  });
+  await page.goto('/');
+  await expect(page.getByText('There are no events to book.')).toBeVisible();
 });

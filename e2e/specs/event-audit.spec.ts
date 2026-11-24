@@ -1,3 +1,4 @@
+import { openAsOrganiser } from '../helpers.ts';
 import { expect, test } from '@playwright/test';
 import { answer, createEvent, dayFromNow, showView } from '../helpers.ts';
 
@@ -17,7 +18,7 @@ test('crossing the breakpoint keeps both panels mounted', async ({
   const { id } = await createEvent(request);
   await answer(request, id, 'Anna', [dayFromNow(4)]);
   await page.setViewportSize({ width: 1200, height: 900 });
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   const grid = page.getByRole('grid', { name: 'Group' });
   await expect(grid).toBeVisible();
   await (await grid.elementHandle())!.evaluate((node) => {
@@ -38,7 +39,7 @@ test('the headings of the group view never skip a level', async ({
   await answer(request, id, 'Anna', [dayFromNow(4)]);
   for (const width of [1200, 600]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(`/e/${id}`);
+    await openAsOrganiser(page, { id });
     await showView(page, 'group');
     await expect(page.getByRole('grid', { name: 'Group' })).toBeVisible();
     const levels = await page
@@ -66,7 +67,7 @@ test('a stream that fails at network level falls back to polling', async ({
   const { id } = await createEvent(request);
   await page.route('**/api/events/*/stream', (route) => route.abort());
   await page.setViewportSize({ width: 1200, height: 900 });
-  await page.goto(`/e/${id}`);
+  await openAsOrganiser(page, { id });
   await showView(page, 'group');
   await expect(page.getByText('No answers yet')).toBeVisible();
   await answer(request, id, 'Zora', [dayFromNow(4)]);

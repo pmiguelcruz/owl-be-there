@@ -199,14 +199,14 @@ describe('pages', () => {
     expect(body).toContain(`<link rel="icon" href="${emojiIcon('⚽')}" />`);
   });
 
-  it('counts answers and announces a chosen date in the preview, in the event language', async () => {
+  it('announces a chosen date in the event language and keeps answers out of public previews', async () => {
     t = await testApp();
     const { id, adminToken } = await createEvent(t.app, { language: 'de' });
     const max = await join(t.app, id, 'Max');
     await mark(t.app, id, max, WEEKEND);
     expect(
       (await t.app.inject({ method: 'GET', url: `/e/${id}` })).body
-    ).toContain('bisher 1 Antwort');
+    ).not.toContain('bisher 1 Antwort');
     await setStatus(t.app, id, adminToken, {
       status: 'finalized',
       start: '2027-03-06',
@@ -297,7 +297,7 @@ describe('pages', () => {
       );
       const max = await join(t.app, id, 'Max');
       await mark(t.app, id, max, WEEKEND);
-      expect(await description(id)).toContain('1 answer so far');
+      expect(await description(id)).not.toContain('1 answer so far');
     });
   });
 
@@ -969,7 +969,7 @@ describe('preview pictures', () => {
     );
   });
 
-  it('draws a changed poll anew', async () => {
+  it('keeps participant marks out of the public preview', async () => {
     t = await testApp();
     const { id } = await createEvent(t.app);
     const get = async () =>
@@ -979,7 +979,7 @@ describe('preview pictures', () => {
     expect((await get()).equals(first)).toBe(true);
     const max = await join(t.app, id, 'Max');
     await mark(t.app, id, max, WEEKEND);
-    expect((await get()).equals(first)).toBe(false);
+    expect((await get()).equals(first)).toBe(true);
   });
 
   it('draws Japanese events, even without the Japanese font at hand', async () => {

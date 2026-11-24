@@ -1,4 +1,4 @@
-import { CREATION_HEADER } from '@owl/shared';
+import { ADMIN_HEADER } from '@owl/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { countEvents } from '../src/db/repo.js';
 import {
@@ -43,17 +43,16 @@ describe('PIN-protected event creation', () => {
     expect(session.statusCode).toBe(200);
     expect(session.headers['cache-control']).toBe('no-store');
     const token = session.json().token as string;
-    const headers = { [CREATION_HEADER]: token };
+    const headers = { [ADMIN_HEADER]: token };
     expect(
-      (await create({ [CREATION_HEADER]: 'x' + token.slice(1) })).statusCode
+      (await create({ [ADMIN_HEADER]: 'x' + token.slice(1) })).statusCode
     ).toBe(403);
 
     const created = await create(headers);
     expect(created.statusCode).toBe(201);
     expect(created.headers['cache-control']).toBe('no-store');
-    expect(
-      (await create({ 'x-admin-token': created.json().adminToken })).statusCode
-    ).toBe(403);
+    expect(created.json()).toEqual({ id: expect.any(String) });
+    expect((await create({ 'x-admin-token': token })).statusCode).toBe(403);
 
     t.clock.time += 30 * 60_000;
     expect((await create(headers)).statusCode).toBe(403);
@@ -69,7 +68,7 @@ describe('PIN-protected event creation', () => {
   });
 
   it('disables creation when the PIN is not configured', async () => {
-    const off = await testApp({ env: { ADMIN_PIN: '' } });
+    const off = await testApp({ env: { ADMIN_PIN_KEY: '' } });
     try {
       expect(
         (await off.app.inject('/api/instance')).json().creationEnabled

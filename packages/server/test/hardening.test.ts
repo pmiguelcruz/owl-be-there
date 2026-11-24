@@ -200,10 +200,11 @@ describe('how far ahead days may lie', () => {
   });
 
   it('refuses a far day added by an edit', async () => {
-    const { id, adminToken } = await createEvent(t.app);
+    const { id } = await createEvent(t.app);
     // Within one span of the first day, but the clock has run on, and by more
     // than the day of slack.
     t.clock.advanceDays(-(LIMITS.horizon + 2));
+    const adminToken = (await creationHeaders(t.app))['x-site-admin-token']!;
     const response = await patchEvent(t.app, id, adminToken, {
       days: [...DAYS, '2027-03-08'],
       baseDays: DAYS,
@@ -236,30 +237,6 @@ describe('the organiser list', () => {
     expect(over.json().error).toBe('full');
     // Exactly to the limit is fine.
     expect((await add(id, adminToken, names(141, 150))).statusCode).toBe(200);
-  });
-});
-
-describe('checking an organiser key', () => {
-  it('answers 204 for the key and 403 for anything else', async () => {
-    const { id, adminToken } = await createEvent(t.app);
-    const check = (token?: string) =>
-      t.app.inject({
-        method: 'GET',
-        url: `/api/events/${id}/admin`,
-        ...(token !== undefined && { headers: adminHeaders(token) }),
-      });
-    expect((await check(adminToken)).statusCode).toBe(204);
-    expect((await check('A'.repeat(43))).statusCode).toBe(403);
-    expect((await check()).statusCode).toBe(403);
-  });
-
-  it('is a 404 for an event that does not exist', async () => {
-    const response = await t.app.inject({
-      method: 'GET',
-      url: '/api/events/AAAAAAAAAAAA/admin',
-      headers: adminHeaders('x'.repeat(43)),
-    });
-    expect(response.statusCode).toBe(404);
   });
 });
 
@@ -415,10 +392,21 @@ describe('two requests for one name at once', () => {
 
   it('lets only one of two first passwords protect a name', async () => {
     const { id } = await createEvent(t.app);
-    await join(t.app, id, 'Max');
+    const owner = await join(t.app, id, 'Max');
+    const headers = { 'x-participant-token': owner.token };
     const [a, b] = await Promise.all([
-      sessionRequest(t.app, id, { name: 'Max', password: 'secret-1' }),
-      sessionRequest(t.app, id, { name: 'Max', password: 'secret-2' }),
+      sessionRequest(
+        t.app,
+        id,
+        { name: 'Max', password: 'secret-1' },
+        { headers }
+      ),
+      sessionRequest(
+        t.app,
+        id,
+        { name: 'Max', password: 'secret-2' },
+        { headers }
+      ),
     ]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
     const winner = a.statusCode === 200 ? 'secret-1' : 'secret-2';

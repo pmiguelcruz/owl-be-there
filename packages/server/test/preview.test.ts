@@ -25,7 +25,7 @@ import {
 import {
   CLIENT_DIR,
   createEvent,
-  TEST_ADMIN_PIN,
+  TEST_PIN_ENV,
   join,
   mark,
   testApp,
@@ -909,7 +909,7 @@ describe('the budget for new pictures', () => {
 
   it('answers 503 with Retry-After on the route; pictures already drawn are still served', async () => {
     const config = loadConfig({
-      ADMIN_PIN: TEST_ADMIN_PIN,
+      ...TEST_PIN_ENV,
       PUBLIC_URL: 'https://owl.example.org',
       LOG_LEVEL: 'silent',
       RATE_LIMIT_MULTIPLIER: '1000',

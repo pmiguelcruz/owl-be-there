@@ -1,3 +1,4 @@
+import { openAsOrganiser } from '../helpers.ts';
 import { expect, test, type Page } from '@playwright/test';
 import { LANGUAGES } from '@owl/shared';
 import {
@@ -76,7 +77,7 @@ for (const language of LANGUAGES) {
     const fonts = watchFullCjkFonts(page);
 
     await page.goto(`/${language}`);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByText('There are no events to book.')).toBeVisible();
     await check(page, language, `/${language}`);
 
     // Half a year: every month's name and weeks of one and two digits.
@@ -103,7 +104,8 @@ for (const language of LANGUAGES) {
     await check(page, language, `/e/${id} my days`);
     await expectCalendarHeadersFit(page, `/e/${id} my days`);
 
-    // The group view: the second tab on a phone.
+    // The group view is visible after unlocking Admin.
+    await openAsOrganiser(page, { id, adminToken });
     const tabs = page.getByRole('tab');
     if (await tabs.first().isVisible()) await tabs.nth(1).click();
     await expect(
@@ -113,7 +115,6 @@ for (const language of LANGUAGES) {
     await expectCalendarHeadersFit(page, `/e/${id} group`);
 
     // The organiser panel with every section open.
-    await page.goto(`/e/${id}#admin=${adminToken}`);
     const sections = page.locator('details > summary');
     await expect(sections.first()).toBeVisible();
     for (const summary of await sections.all()) await summary.click();
@@ -145,11 +146,12 @@ test('week buttons, header links and the password checkbox are 24 pixels on a ph
   await expect(
     page.locator('[role="grid"]:visible [data-day]').first()
   ).toBeVisible();
-  const [count, small] = await page.evaluate(() => {
-    const targets = [
+  const [weeks, links, small] = await page.evaluate(() => {
+    const weeks = [
       ...document.querySelectorAll('[role="grid"] .cal-rowhead button'),
-      ...document.querySelectorAll('header nav a'),
     ];
+    const links = [...document.querySelectorAll('header nav a')];
+    const targets = [...weeks, ...links];
     const tooSmall = targets
       .map((target) => ({
         name: target.textContent,
@@ -157,9 +159,10 @@ test('week buttons, header links and the password checkbox are 24 pixels on a ph
       }))
       .filter(({ box }) => box.width < 24 || box.height < 24)
       .map(({ name, box }) => `${name}: ${box.width}x${box.height}`);
-    return [targets.length, tooSmall] as const;
+    return [weeks.length, links.length, tooSmall] as const;
   });
-  expect(count).toBeGreaterThan(5);
+  expect(weeks).toBeGreaterThan(0);
+  expect(links).toBe(2);
   expect(small).toEqual([]);
   await expectNoHorizontalOverflow(page, 'a 320 pixel phone');
 });
@@ -205,30 +208,25 @@ test('a normal title breaks between words, a long one still wraps', async ({
 // with one long unbroken word pushed the start page wider than a phone.
 test('a remembered event with a long unbroken title fits a phone', async ({
   page,
+  request,
 }, testInfo) => {
   test.skip(!testInfo.project.use.hasTouch, 'phone width: touch projects only');
   await page.setViewportSize({ width: 360, height: 740 });
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'owl.events',
-      JSON.stringify([
-        {
-          id: '3Hk9TqXw5RdE',
-          title: 'Chess night',
-          emoji: 'soccer',
-          role: 'participant',
-        },
-        {
-          id: 'Cm4Pz8WnJ2yA',
-          title:
-            'Garden party Donaudampfschifffahrtsgesellschaftskapitaensmuetze',
-          emoji: 'drinks',
-          role: 'organiser',
-        },
-      ])
-    );
+  const chess = await createEvent(request, { title: 'Chess night' });
+  const garden = await createEvent(request, {
+    title: 'Garden party Donaudampfschifffahrtsgesellschaftskapitaensmuetze',
   });
+  await page.addInitScript(
+    (ids) => {
+      localStorage.setItem(
+        'owl.events',
+        JSON.stringify(ids.map((id) => ({ id })))
+      );
+    },
+    [chess.id, garden.id]
+  );
   await page.goto('/en');
   await expect(page.getByRole('link', { name: /Chess night/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Garden party/ })).toBeVisible();
   await expectNoHorizontalOverflow(page, 'the start page with a long title');
 });

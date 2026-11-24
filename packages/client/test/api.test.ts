@@ -55,7 +55,7 @@ describe('api', () => {
     expect(result.id).toBe(EVENT_ID);
     expect(calls[0]!.url).toBe('/api/events');
     expect(calls[0]!.init.method).toBe('POST');
-    expect(new Headers(calls[0]!.init.headers).get('x-creation-token')).toBe(
+    expect(new Headers(calls[0]!.init.headers).get('x-site-admin-token')).toBe(
       'test-token'
     );
     expect(
@@ -214,7 +214,7 @@ describe('api', () => {
     expect(calls[1]!.init.keepalive).toBe(true);
   });
 
-  it('sends the organiser key for every organiser call', async () => {
+  it('sends the site session for every administrator call', async () => {
     const calls = mockFetch(
       jsonResponse(200, eventSnapshot()),
       jsonResponse(200, eventSnapshot()),
@@ -250,7 +250,7 @@ describe('api', () => {
     await api.deleteParticipant(EVENT_ID, PID, { admin: 'adm' });
     for (const call of calls) {
       expect(
-        (call.init.headers as Record<string, string>)['x-admin-token']
+        (call.init.headers as Record<string, string>)['x-site-admin-token']
       ).toBe('adm');
     }
     expect(calls.map((c) => c.init.method)).toEqual([

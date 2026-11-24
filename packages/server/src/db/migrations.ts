@@ -176,6 +176,11 @@ CREATE INDEX events_expires_on ON events (expires_on);
     version: 4,
     sql: 'ALTER TABLE events ADD COLUMN theme TEXT;',
   },
+  {
+    version: 5,
+    sql: `ALTER TABLE participants ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0 CHECK (claimed IN (0, 1));
+UPDATE participants SET claimed = 1 WHERE source = 'self' OR password_hash IS NOT NULL OR marks_at IS NOT NULL;`,
+  },
 ];
 
 export class MigrationError extends Error {

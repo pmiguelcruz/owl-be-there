@@ -9,7 +9,7 @@ export type Route =
   | { page: 'home'; language?: Language }
   | { page: 'event'; id: string }
   | { page: 'about' }
-  | { page: 'admin' }
+  | { page: 'admin'; id?: string }
   | { page: 'imprint' }
   | { page: 'not-found' };
 
@@ -18,6 +18,9 @@ export function parseRoute(pathname: string): Route {
   // The server answers these with and without a trailing slash; so does the app.
   if (/^\/(about|privacy)\/?$/.test(pathname)) return { page: 'about' };
   if (/^\/admin\/?$/.test(pathname)) return { page: 'admin' };
+  const adminEvent = /^\/admin\/events\/([^/]+)\/?$/.exec(pathname);
+  if (adminEvent && isId(adminEvent[1]!))
+    return { page: 'admin', id: adminEvent[1]! };
   if (/^\/imprint\/?$/.test(pathname)) return { page: 'imprint' };
   const home = /^\/([a-z]{2}(?:-[A-Za-z0-9]+)?)\/?$/.exec(pathname);
   if (home && isLanguage(home[1]!)) return { page: 'home', language: home[1] };
@@ -51,7 +54,8 @@ export function headingKey(
 
 /** Equal for routes a reader sees as one page: the start page in any language. */
 export function placeOf(route: Route): string {
-  return route.page === 'event' ? `event/${route.id}` : route.page;
+  if (route.page === 'event') return `event/${route.id}`;
+  return route.page === 'admin' && route.id ? `admin/${route.id}` : route.page;
 }
 
 const listeners = new Set<() => void>();
