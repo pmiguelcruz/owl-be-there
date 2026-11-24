@@ -1,7 +1,7 @@
 import { drawPattern, type Pattern } from '@owl/shared';
-import { useId } from 'react';
+import { memo, useId } from 'react';
 
-export function EventWallpaper({
+export const EventWallpaper = memo(function EventWallpaper({
   pattern,
   className,
   preview = false,
@@ -11,7 +11,7 @@ export function EventWallpaper({
   preview?: boolean;
 }) {
   const id = useId();
-  const { width, height, marks, palette, texture, weight } =
+  const { width, height, marks, palette, spacing, texture, weight } =
     drawPattern(pattern);
   return (
     <svg
@@ -21,6 +21,7 @@ export function EventWallpaper({
       width="100%"
       height="100%"
       data-wallpaper={preview ? 'preview' : 'event'}
+      data-spacing={spacing}
       data-pattern={`${pattern.kind}:${pattern.seed}`}
     >
       <defs>
@@ -29,31 +30,35 @@ export function EventWallpaper({
           width={width}
           height={height}
           patternUnits="userSpaceOnUse"
-          patternTransform={preview ? 'scale(.64)' : undefined}
+          patternTransform="scale(.5)"
         >
-          {marks.map(({ d, tone, fill }, index) => (
-            <path
-              key={index}
-              d={d}
-              fill={fill ? palette[tone] : 'none'}
-              stroke={fill ? undefined : palette[tone]}
-              strokeWidth={fill ? undefined : weight}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-          {texture && (
-            <path
-              d={texture}
-              fill="none"
-              stroke={palette.base}
-              strokeWidth=".65"
-            />
-          )}
+          <g opacity={spacing === 'packed' ? '0.18' : '0.27'}>
+            {marks.map(({ d, tone, fill, transform }, index) => (
+              <path
+                key={index}
+                d={d}
+                transform={transform}
+                fillRule="evenodd"
+                fill={fill ? palette[tone] : 'none'}
+                stroke={fill ? undefined : palette[tone]}
+                strokeWidth={fill ? undefined : weight}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            {texture && (
+              <path
+                d={texture}
+                fill="none"
+                stroke={palette.base}
+                strokeWidth=".65"
+              />
+            )}
+          </g>
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill={palette.base} />
       <rect width="100%" height="100%" fill={`url(#${id})`} />
     </svg>
   );
-}
+});

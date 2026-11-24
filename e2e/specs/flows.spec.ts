@@ -38,6 +38,12 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   await expect(options).toHaveCount(10);
   const original = await recipes();
   expect(new Set(original).size).toBe(10);
+  await expect(
+    picker.locator('label [data-spacing="sparse"]').first()
+  ).toBeVisible();
+  await expect(
+    picker.locator('label [data-spacing="packed"]').first()
+  ).toBeVisible();
   await picker.getByRole('button', { name: 'Refresh patterns' }).click();
   const refreshed = await recipes();
   expect(new Set(refreshed).size).toBe(10);
@@ -96,6 +102,43 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   ).toBeVisible();
   const eventWallpaper = page.locator('[data-wallpaper="event"]');
   await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
+  await expect(eventWallpaper.locator('pattern')).toHaveAttribute(
+    'patternTransform',
+    'scale(.5)'
+  );
+  await expect(eventWallpaper.locator('pattern g')).toHaveAttribute(
+    'opacity',
+    (await eventWallpaper.getAttribute('data-spacing')) === 'packed'
+      ? '0.18'
+      : '0.27'
+  );
+  const colors = page.locator('[data-event-palette]');
+  const themeColor = (token: string) =>
+    colors.evaluate(
+      (element, name) =>
+        getComputedStyle(element).getPropertyValue(name).trim(),
+      token
+    );
+  const initialAccent = await themeColor('--owl-brand');
+  const initialBase = await themeColor('--owl-bg');
+  await expect(eventWallpaper.locator('rect').first()).toHaveAttribute(
+    'fill',
+    initialBase
+  );
+  const button = page.getByRole('button', { name: 'Share', exact: true });
+  const rgb = (hex: string) =>
+    `rgb(${hex
+      .slice(1)
+      .match(/../g)!
+      .map((channel) => parseInt(channel, 16))
+      .join(', ')})`;
+  await expect(button).toHaveCSS('background-color', rgb(initialAccent));
+  const about = page.getByRole('link', { name: 'About', exact: true });
+  const card = page.locator('main section.bg-surface:visible').first();
+  const background = (element: Locator) =>
+    element.evaluate((node) => getComputedStyle(node).backgroundColor);
+  const initialSurface = await background(card);
+  await expect(about).toHaveCSS('background-color', initialSurface);
 
   const id = new URL(page.url()).pathname.split('/').at(-1)!;
   await openAsOrganiser(page, { id });
@@ -107,11 +150,28 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   const editor = page.getByRole('group', { name: 'Wallpaper pattern' });
   const preview = editor.locator('figure [data-pattern]');
   await expect(preview).toHaveAttribute('data-pattern', wallpaper);
-  await editor.getByRole('radio', { name: 'Pattern 5', exact: true }).check();
+  const otherColor = await editor
+    .locator('label [data-pattern]')
+    .evaluateAll(
+      (options, base) =>
+        options.findIndex(
+          (option) =>
+            option.querySelector('rect')?.getAttribute('fill') !== base
+        ),
+      initialBase
+    );
+  expect(otherColor).toBeGreaterThanOrEqual(0);
+  await editor.getByRole('radio').nth(otherColor).check();
   const replacement = (await preview.getAttribute('data-pattern'))!;
   await expect(eventWallpaper).toHaveAttribute('data-pattern', wallpaper);
   await page.getByRole('button', { name: 'Save pattern' }).click();
   await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  const newAccent = await themeColor('--owl-brand');
+  expect(newAccent).not.toBe(initialAccent);
+  await expect(button).toHaveCSS('background-color', rgb(newAccent));
+  const newSurface = await background(card);
+  expect(newSurface).not.toBe(initialSurface);
+  await expect(about).toHaveCSS('background-color', newSurface);
   await expect(page.getByText('2 days in a row')).toBeVisible();
   expect(new URL(page.url()).hash).toBe('');
   await showView(page, 'mine');
@@ -120,6 +180,7 @@ test('an organiser creates an event with the wizard and gets the share sheet', a
   // Participants get the saved wallpaper with their registration view.
   await page.goto(new URL(link).pathname);
   await expect(eventWallpaper).toHaveAttribute('data-pattern', replacement);
+  expect(await themeColor('--owl-brand')).toBe(newAccent);
   await expect(page.getByRole('button', { name: 'Save pattern' })).toHaveCount(
     0
   );

@@ -1,12 +1,12 @@
-import { PATTERN_KINDS, type Pattern } from '@owl/shared';
+import { patternBatch, type Pattern } from '@owl/shared';
 import { useId } from 'react';
 import { useI18n } from '../i18n/index.tsx';
 import { EventWallpaper } from './EventWallpaper.tsx';
 import { Button } from './ui.tsx';
 
-export function randomPatterns(): Pattern[] {
-  const seeds = crypto.getRandomValues(new Uint32Array(PATTERN_KINDS.length));
-  return PATTERN_KINDS.map((kind, index) => ({ kind, seed: seeds[index]! }));
+export function randomPatterns(previous: readonly Pattern[] = []): Pattern[] {
+  const words = new Uint32Array(1);
+  return patternBatch(() => crypto.getRandomValues(words)[0]!, previous);
 }
 
 export function samePattern(a: Pattern, b: Pattern): boolean {

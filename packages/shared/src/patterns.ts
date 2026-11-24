@@ -1,29 +1,157 @@
-import type { Pattern } from './event-theme.js';
+import {
+  MOTIF_PATTERN_KINDS,
+  TEXTILE_PATTERN_KINDS,
+  type Pattern,
+} from './event-theme.js';
 
 type Tone = 'ink' | 'accent' | 'thread';
 interface Mark {
   d: string;
   tone: Tone;
   fill?: boolean;
+  transform?: string;
 }
 interface Tile {
   width: number;
   height: number;
   marks: Mark[];
   texture?: string;
+  spacing?: Spacing;
 }
 type Pick = (min: number, max: number) => number;
 
+// The first eight entries keep the color identity of earlier saved textiles.
 const PALETTES = [
-  { base: '#0e1427', ink: '#384a77', accent: '#655483', thread: '#36716a' },
-  { base: '#1e101b', ink: '#5b2c4a', accent: '#884e62', thread: '#796035' },
-  { base: '#0a1918', ink: '#214944', accent: '#3e7062', thread: '#79643b' },
-  { base: '#1b1610', ink: '#553b25', accent: '#846039', thread: '#72504a' },
-  { base: '#161124', ink: '#40365e', accent: '#685688', thread: '#416978' },
-  { base: '#1f1216', ink: '#5a3037', accent: '#885053', thread: '#486e69' },
-  { base: '#111914', ink: '#3b5030', accent: '#687343', thread: '#776047' },
-  { base: '#0d1720', ink: '#2b4c5d', accent: '#3f7080', thread: '#655783' },
+  {
+    base: '#0e1427',
+    ink: '#384a77',
+    accent: '#655483',
+    thread: '#36716a',
+    highlight: '#aebdff',
+  },
+  {
+    base: '#1e101b',
+    ink: '#5b2c4a',
+    accent: '#884e62',
+    thread: '#796035',
+    highlight: '#f1a9cb',
+  },
+  {
+    base: '#0a1918',
+    ink: '#214944',
+    accent: '#3e7062',
+    thread: '#79643b',
+    highlight: '#91dbc1',
+  },
+  {
+    base: '#1b1610',
+    ink: '#553b25',
+    accent: '#846039',
+    thread: '#72504a',
+    highlight: '#f5c384',
+  },
+  {
+    base: '#161124',
+    ink: '#40365e',
+    accent: '#685688',
+    thread: '#416978',
+    highlight: '#c9aff3',
+  },
+  {
+    base: '#1f1216',
+    ink: '#5a3037',
+    accent: '#885053',
+    thread: '#486e69',
+    highlight: '#f1a69b',
+  },
+  {
+    base: '#111914',
+    ink: '#3b5030',
+    accent: '#687343',
+    thread: '#776047',
+    highlight: '#bcda8f',
+  },
+  {
+    base: '#0d1720',
+    ink: '#2b4c5d',
+    accent: '#3f7080',
+    thread: '#655783',
+    highlight: '#97d5eb',
+  },
+  {
+    base: '#1c1810',
+    ink: '#584521',
+    accent: '#786a35',
+    thread: '#947035',
+    highlight: '#f1da80',
+  },
+  {
+    base: '#1e101e',
+    ink: '#5b2b55',
+    accent: '#84416b',
+    thread: '#6c546f',
+    highlight: '#eda4e1',
+  },
+  {
+    base: '#131925',
+    ink: '#37476a',
+    accent: '#527596',
+    thread: '#536f55',
+    highlight: '#87d4db',
+  },
+  {
+    base: '#1f1311',
+    ink: '#694031',
+    accent: '#925640',
+    thread: '#89663d',
+    highlight: '#f7b294',
+  },
 ] as const;
+
+type MotifKind = (typeof MOTIF_PATTERN_KINDS)[number];
+const SPACINGS = ['sparse', 'airy', 'clustered', 'packed'] as const;
+type Spacing = (typeof SPACINGS)[number];
+
+const isMotif = (kind: Pattern['kind']): kind is MotifKind =>
+  (MOTIF_PATTERN_KINDS as readonly string[]).includes(kind);
+
+function shuffled<T>(values: readonly T[], word: () => number): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const other = word() % (index + 1);
+    [result[index], result[other]] = [result[other]!, result[index]!];
+  }
+  return result;
+}
+
+/** Five silhouettes and five textiles, with all four silhouette spacings. */
+export function patternBatch(
+  word: () => number,
+  previous: readonly Pattern[] = []
+): Pattern[] {
+  const oldKinds = new Set(previous.map(({ kind }) => kind));
+  const motifs = shuffled(MOTIF_PATTERN_KINDS, word);
+  const fresh = motifs.find((kind) => !oldKinds.has(kind)) ?? motifs[0]!;
+  const kinds = [
+    fresh,
+    ...motifs.filter((kind) => kind !== fresh).slice(0, 4),
+    ...shuffled(TEXTILE_PATTERN_KINDS, word).slice(0, 5),
+  ] as const;
+  const layouts = shuffled([0, 1, 2, 3, word() % 4], word);
+  return shuffled(
+    kinds.map((kind, index) => {
+      const random = word() >>> 0;
+      let seed =
+        index < layouts.length
+          ? ((random & ~3) | layouts[index]!) >>> 0
+          : random;
+      const match = previous.find((pattern) => pattern.kind === kind);
+      if (match?.seed === seed) seed = (seed + 4) >>> 0;
+      return { kind, seed };
+    }),
+    word
+  );
+}
 
 function seeded(seed: number) {
   let state = seed;
@@ -50,6 +178,91 @@ const ring = (x: number, y: number, radius: number) =>
 const TAU = 2 * Math.PI;
 const point = (x: number, y: number, radius: number, angle: number) =>
   `${(x + radius * Math.cos(angle)).toFixed(2)},${(y + radius * Math.sin(angle)).toFixed(2)}`;
+
+function star(points: number, inner: number): string {
+  const vertices = Array.from({ length: points * 2 }, (_, index) =>
+    point(0, 0, index % 2 ? inner : 1, TAU * (index / (points * 2) - 0.25))
+  );
+  return `M${vertices.join('L')}Z`;
+}
+
+const MOTIF_PATHS: Record<MotifKind, (pick: Pick) => string> = {
+  stars: (pick) => star(pick(5, 7), pick(39, 59) / 100),
+  hearts: () =>
+    'M0,.93C-.18,.74-1,.16-.96,-.34C-.92,-.88-.32,-1.05,0,-.54C.32,-1.05,.92,-.88,.96,-.34C1,.16,.18,.74,0,.93Z',
+  sparks: (pick) => star(4, pick(17, 27) / 100),
+  moons: () => 'M.37,-.93A1,1 0 1 0 .92,.39A.85,.85 0 0 1 .37,-.93Z',
+  bows: () =>
+    'M-.14,0C-.44,-.55-.98,-.77-.99,-.36L-.99,.36C-.98,.77-.44,.55-.14,0ZM.14,0C.44,-.55,.98,-.77,.99,-.36L.99,.36C.98,.77,.44,.55,.14,0ZM-.14,-.2H.14Q.26,0,.14,.2H-.14Q-.26,0,-.14,-.2Z',
+  drops: () =>
+    'M0,-1C.14,-.70,.72,-.04,.72,.35A.72,.66 0 0 1 -.72,.35C-.72,-.04,-.14,-.70,0,-1Z',
+  petals: () =>
+    'M0,0C-.87,-.24-.28,-1,0,-.97C.28,-1,.87,-.24,0,0ZM0,0C.24,-.87,1,-.28,.97,0C1,.28,.24,.87,0,0ZM0,0C.87,.24,.28,1,0,.97C-.28,1,-.87,.24,0,0ZM0,0C-.24,.87,-1,.28,-.97,0C-1,-.28,-.24,-.87,0,0Z',
+  rings: (pick) => ring(0, 0, 1) + ring(0, 0, pick(37, 70) / 100),
+};
+
+function motifTile(kind: MotifKind, spacing: Spacing, pick: Pick): Tile {
+  const pitch = {
+    sparse: () => pick(92, 132),
+    airy: () => pick(42, 59),
+    clustered: () => pick(48, 64),
+    packed: () => pick(17, 24),
+  }[spacing]();
+  const side = pitch * 2;
+  const d = MOTIF_PATHS[kind](pick);
+  const marks: Mark[] = [];
+  const tones = ['ink', 'accent', 'thread'] as const;
+
+  function stamp(
+    x: number,
+    y: number,
+    radius: number,
+    angle: number,
+    tone: Tone
+  ) {
+    // Wrap the part of a packed motif that crosses a tile edge.
+    const horizontal =
+      x < radius ? [x, x + side] : x > side - radius ? [x, x - side] : [x];
+    const vertical =
+      y < radius ? [y, y + side] : y > side - radius ? [y, y - side] : [y];
+    for (const left of horizontal) {
+      for (const top of vertical) {
+        marks.push({
+          d,
+          tone,
+          fill: true,
+          transform: `translate(${left.toFixed(2)} ${top.toFixed(2)}) rotate(${angle}) scale(${radius.toFixed(2)})`,
+        });
+      }
+    }
+  }
+
+  for (let row = 0; row < 2; row += 1) {
+    for (let column = 0; column < 2; column += 1) {
+      const packed = spacing === 'packed';
+      const jitter = packed ? 0 : Math.floor(pitch * 0.17);
+      const x = (column + 0.5) * pitch + pick(-jitter, jitter);
+      const y = (row + 0.5) * pitch + pick(-jitter, jitter);
+      const radius = packed ? pitch * 0.58 : pick(8, 13);
+      const tilt = pick(-35, 35);
+      stamp(x, y, radius, tilt, tones[pick(0, 2)]!);
+      if (spacing === 'clustered') {
+        const angle = (pick(0, 359) * TAU) / 360;
+        for (const offset of [0, 2.2]) {
+          const direction = angle + offset;
+          stamp(
+            x + (radius + 8) * Math.cos(direction),
+            y + (radius + 8) * Math.sin(direction),
+            pick(3, 6),
+            pick(-45, 45),
+            'thread'
+          );
+        }
+      }
+    }
+  }
+  return { width: side, height: side, marks, spacing };
+}
 
 function printedDots(pick: Pick): Tile {
   const pitch = pick(23, 31);
@@ -172,7 +385,10 @@ function honeycomb(pick: Pick): Tile {
   return { width: step * 2, height: r * 3, marks };
 }
 
-function tileFor(kind: Pattern['kind'], pick: Pick): Tile {
+function tileFor(
+  kind: (typeof TEXTILE_PATTERN_KINDS)[number],
+  pick: Pick
+): Tile {
   switch (kind) {
     case 'printed-dots':
       return printedDots(pick);
@@ -287,9 +503,22 @@ function tileFor(kind: Pattern['kind'], pick: Pick): Tile {
   }
 }
 
+function paletteIndex(pattern: Pattern, random: () => number) {
+  const length = isMotif(pattern.kind) ? PALETTES.length : 8;
+  return Math.floor(random() * length);
+}
+
+export function patternPalette(pattern: Pattern) {
+  return PALETTES[paletteIndex(pattern, seeded(pattern.seed))]!;
+}
+
 export function drawPattern(pattern: Pattern) {
   const random = seeded(pattern.seed);
+  const index = paletteIndex(pattern, random);
   const pick: Pick = (min, max) => min + Math.floor(random() * (max - min + 1));
-  const palette = PALETTES[pick(0, PALETTES.length - 1)]!;
-  return { ...tileFor(pattern.kind, pick), palette, weight: pick(12, 22) / 10 };
+  const { kind, seed } = pattern;
+  const tile = isMotif(kind)
+    ? motifTile(kind, SPACINGS[seed % SPACINGS.length]!, pick)
+    : tileFor(kind, pick);
+  return { ...tile, palette: PALETTES[index]!, weight: pick(12, 22) / 10 };
 }

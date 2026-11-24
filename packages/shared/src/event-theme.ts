@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PATTERN_KINDS = [
+export const TEXTILE_PATTERN_KINDS = [
   'printed-dots',
   'gingham',
   'stripes',
@@ -11,6 +11,22 @@ export const PATTERN_KINDS = [
   'lattice',
   'honeycomb',
   'houndstooth',
+] as const;
+
+export const MOTIF_PATTERN_KINDS = [
+  'stars',
+  'hearts',
+  'sparks',
+  'moons',
+  'bows',
+  'drops',
+  'petals',
+  'rings',
+] as const;
+
+export const PATTERN_KINDS = [
+  ...TEXTILE_PATTERN_KINDS,
+  ...MOTIF_PATTERN_KINDS,
 ] as const;
 
 export const PatternSpec = z.strictObject({
@@ -52,5 +68,8 @@ export function patternFor(id: string, theme?: EventThemeData): Pattern {
   let seed = 2166136261;
   for (const character of identity)
     seed = Math.imul(seed ^ character.charCodeAt(0), 16777619) >>> 0;
-  return { kind: PATTERN_KINDS[seed % PATTERN_KINDS.length]!, seed };
+  return {
+    kind: TEXTILE_PATTERN_KINDS[seed % TEXTILE_PATTERN_KINDS.length]!,
+    seed,
+  };
 }

@@ -116,7 +116,7 @@ function PatternForm({
       <PatternPicker
         choices={choices}
         selected={selected}
-        onRefresh={() => setChoices(randomPatterns())}
+        onRefresh={() => setChoices(randomPatterns(choices))}
         onSelect={(pattern) => {
           setDraft(pattern);
           onEdit();

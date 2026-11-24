@@ -234,7 +234,7 @@ export function CreateWizard({
             </Field>
             <PatternPicker
               choices={patterns}
-              onRefresh={() => setPatterns(randomPatterns())}
+              onRefresh={() => setPatterns(randomPatterns(patterns))}
               selected={pattern}
               onSelect={setPattern}
             />

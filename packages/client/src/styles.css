@@ -137,6 +137,30 @@
   --owl-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
 }
 
+/* Tint event chrome with the wallpaper palette. Calendar availability keeps
+ * its shared green and amber colors. */
+[data-event-palette] {
+  --owl-bg: var(--event-base);
+  --owl-surface: color-mix(in srgb, var(--event-base) 73%, var(--event-ink));
+  --owl-sunken: color-mix(in srgb, var(--event-base) 58%, var(--event-ink));
+  --owl-line: color-mix(in srgb, var(--event-base) 39%, var(--event-ink));
+  --owl-line-strong: color-mix(
+    in srgb,
+    var(--event-ink) 70%,
+    var(--event-highlight)
+  );
+  --owl-brand: var(--event-highlight);
+  --owl-brand-hover: color-mix(in srgb, var(--event-highlight) 78%, white);
+  --owl-brand-ink: var(--event-base);
+  --owl-brand-soft: color-mix(
+    in srgb,
+    var(--event-base) 83%,
+    var(--event-highlight)
+  );
+  --owl-focus: color-mix(in srgb, var(--event-highlight) 68%, white);
+  --owl-heat-0: var(--owl-sunken);
+}
+
 /*
  * Tailwind 4 gives buttons the arrow cursor; everything that does something on
  * a click shows the hand again. Links are listed too: WebKit leaves them at

@@ -1,9 +1,16 @@
-import { APP_NAME, hasImprint, LANGUAGE_NAMES } from '@owl/shared';
+import {
+  APP_NAME,
+  hasImprint,
+  LANGUAGE_NAMES,
+  patternPalette,
+  type Pattern,
+} from '@owl/shared';
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { Owl } from './components/Owl.tsx';
@@ -60,6 +67,7 @@ function Shell() {
   const instanceState = useInstance();
   const instance = instanceState.info;
   const [adminSession, setAdminSession] = useState<string | null>(null);
+  const [eventPattern, setEventPattern] = useState<Pattern | null>(null);
   const clearAdmin = useCallback(() => setAdminSession(null), []);
   const { t, language, choice, loadFailed, setLanguage } = useI18n();
 
@@ -84,6 +92,8 @@ function Shell() {
   const eventPage =
     route.page === 'event' ||
     (route.page === 'admin' && Boolean(route.id && adminSession));
+  const palette =
+    eventPage && eventPattern ? patternPalette(eventPattern) : null;
   useEffect(() => {
     if (!eventPage) {
       document.title = heading
@@ -112,6 +122,7 @@ function Shell() {
       page = (
         <EventPage
           key={route.id}
+          onPattern={setEventPattern}
           id={route.id}
           publicUrl={instance?.publicUrl ?? null}
         />
@@ -125,6 +136,7 @@ function Shell() {
         route.id && adminSession ? (
           <EventPage
             key={`admin:${route.id}`}
+            onPattern={setEventPattern}
             id={route.id}
             publicUrl={instance?.publicUrl ?? null}
             adminToken={adminSession}
@@ -148,6 +160,16 @@ function Shell() {
   return (
     <div
       data-event-page={eventPage || undefined}
+      data-event-palette={palette ? true : undefined}
+      style={
+        palette
+          ? ({
+              '--event-base': palette.base,
+              '--event-ink': palette.ink,
+              '--event-highlight': palette.highlight,
+            } as CSSProperties)
+          : undefined
+      }
       className="isolate flex min-h-dvh flex-col"
     >
       <Header />
