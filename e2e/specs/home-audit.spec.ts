@@ -23,9 +23,25 @@ test('the About page fits instead of scrolling the page on a phone', async ({
   expect(overflow).toBe(false);
 });
 
-test('the start page does not scroll sideways at 320px', async ({ page }) => {
+test('the padded wordmark and squared-off controls fit at 320px', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto('/');
+  const wordmark = page.getByRole('link', { name: 'Owl Be There' });
+  const admin = page.getByRole('link', { name: 'Admin' });
+  const panel = page.getByText('Your event list is empty.', { exact: false });
+  await expect(panel).toBeVisible();
+  await expect(wordmark).toHaveCSS('border-radius', '6px');
+  await expect(wordmark).toHaveCSS('padding-inline-start', '10px');
+  await expect(wordmark).toHaveCSS('padding-inline-end', '10px');
+  await expect(wordmark).toHaveCSS('padding-block-start', '8px');
+  await expect(wordmark).toHaveCSS('padding-block-end', '8px');
+  await expect(admin).toHaveCSS('border-radius', '5px');
+  await expect(panel).toHaveCSS('border-radius', '8px');
+  expect((await admin.boundingBox())!.x).toBeGreaterThan(
+    (await wordmark.boundingBox())!.x
+  );
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth
   );

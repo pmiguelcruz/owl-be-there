@@ -204,7 +204,7 @@ export function CreateWizard({
           {STEP_NUMBERS.map((n) => (
             <span
               key={n}
-              className={`h-1.5 flex-1 rounded-full ${n <= step ? 'bg-brand' : 'bg-line'}`}
+              className={`h-1.5 flex-1 rounded-lg ${n <= step ? 'bg-brand' : 'bg-line'}`}
             />
           ))}
         </div>
@@ -364,7 +364,7 @@ export function CreateWizard({
                             }
                         );
                       }}
-                      className={`min-h-11 min-w-12 rounded-full border-2 px-3 font-bold ${
+                      className={`min-h-11 min-w-12 rounded-lg border-2 px-3 font-bold ${
                         on
                           ? 'border-brand bg-brand-soft'
                           : 'border-line bg-surface text-muted'

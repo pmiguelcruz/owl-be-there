@@ -245,7 +245,7 @@ function Header() {
     >
       <Link
         href="/"
-        className="site-wordmark flex min-w-0 items-center gap-2 rounded-full font-black"
+        className="site-wordmark flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 font-black sm:gap-2.5 sm:px-4"
       >
         <Owl size={40} />
         <span className="text-base leading-tight tracking-tight sm:text-xl">

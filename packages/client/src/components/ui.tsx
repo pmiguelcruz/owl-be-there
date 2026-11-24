@@ -35,7 +35,7 @@ const SIZES: Record<ButtonSize, string> = {
 
 /** The look of a button, for a link that navigates and so cannot be a `<button>`. */
 export function buttonClass(variant: ButtonVariant, size: ButtonSize): string {
-  return `inline-flex items-center justify-center rounded-full font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${SIZES[size]} ${VARIANTS[variant]}`;
+  return `inline-flex items-center justify-center rounded-lg font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${SIZES[size]} ${VARIANTS[variant]}`;
 }
 
 export function Button({
@@ -171,7 +171,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex max-w-full rounded-full border-2 border-line bg-sunken p-1"
+      className="inline-flex max-w-full rounded-lg border-2 border-line bg-sunken p-1"
     >
       {options.map((option) => {
         const checked = option.value === value;
@@ -191,7 +191,7 @@ export function Segmented<T extends string>({
               )
             }
             tabIndex={checked ? 0 : -1}
-            className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-center leading-tight font-bold transition sm:px-4 ${
+            className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1 text-center leading-tight font-bold transition sm:px-4 ${
               checked
                 ? 'bg-surface text-ink shadow-card'
                 : 'text-muted hover:text-ink'
@@ -227,7 +227,7 @@ export function Chip({
       aria-pressed={pressed}
       onClick={onClick}
       {...rest}
-      className={`inline-flex max-w-full min-w-0 min-h-11 items-center gap-1.5 rounded-full border-2 px-3.5 font-bold [overflow-wrap:anywhere] transition ${
+      className={`inline-flex max-w-full min-w-0 min-h-11 items-center gap-1.5 rounded-lg border-2 px-3.5 font-bold [overflow-wrap:anywhere] transition ${
         pressed
           ? 'border-brand bg-brand-soft text-ink'
           : 'border-line bg-surface text-muted hover:text-ink'
@@ -316,7 +316,7 @@ export function Dialog({
             <button
               type="button"
               onClick={onClose}
-              className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-sunken"
+              className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-sunken"
               aria-label={t('day.close')}
             >
               <CloseIcon />

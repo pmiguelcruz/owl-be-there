@@ -44,7 +44,7 @@ import { readSession, storeSession, type Session } from '../lib/prefs.ts';
 
 /** The look of the calendar-file and Google links under a decided event. */
 const RAISED_PILL =
-  'inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-4 font-bold shadow-card';
+  'inline-flex min-h-11 items-center gap-2 rounded-lg bg-surface px-4 font-bold shadow-card';
 
 const noop = () => {};
 
@@ -340,7 +340,7 @@ function EventHeader({
           {meta.map((item) => (
             <li
               key={item.text}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-sunken px-3 py-1 text-sm font-bold break-words"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-sunken px-3 py-1 text-sm font-bold break-words"
             >
               {item.icon}
               {item.user ? <bdi>{item.text}</bdi> : item.text}

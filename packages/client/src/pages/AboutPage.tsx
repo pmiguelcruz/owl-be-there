@@ -15,7 +15,7 @@ export function AboutPage() {
   const { t, choice, setLanguage } = useI18n();
   const [theme, setTheme] = useState<ThemeChoice>(readTheme);
   const selectClass =
-    'min-h-10 rounded-full border-2 border-line bg-surface ps-3 font-bold text-ink focus:border-focus';
+    'min-h-10 rounded-lg border-2 border-line bg-surface ps-3 font-bold text-ink focus:border-focus';
 
   return (
     <LegalPage title={t('about.title')}>

@@ -715,7 +715,7 @@ export function CalendarGrid(props: CalendarGridProps) {
                         {unseen && (
                           <span
                             aria-hidden="true"
-                            className="cal-new absolute -top-1 -end-1 rounded-full bg-brand px-1 text-[0.625rem] leading-3 font-black text-brand-ink"
+                            className="cal-new absolute -top-1 -end-1 rounded-lg bg-brand px-1 text-[0.625rem] leading-3 font-black text-brand-ink"
                           >
                             {t('cal.new')}
                           </span>
@@ -723,7 +723,7 @@ export function CalendarGrid(props: CalendarGridProps) {
                         {hint && hint.total > 0 && (
                           <span
                             aria-hidden="true"
-                            className="absolute inset-x-1.5 bottom-1 flex h-1 overflow-hidden rounded-full bg-black/10"
+                            className="absolute inset-x-1.5 bottom-1 flex h-1 overflow-hidden rounded-lg bg-black/10"
                           >
                             <span
                               style={{

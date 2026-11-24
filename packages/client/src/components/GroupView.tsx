@@ -193,7 +193,7 @@ export function GroupView(props: GroupViewProps) {
                       aria-pressed={isSelected}
                       onClick={() => setSelected(isSelected ? null : block)}
                     >
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken font-black">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-sunken font-black">
                         {index === 0 ? (
                           <StarIcon size={16} />
                         ) : (
@@ -216,11 +216,11 @@ export function GroupView(props: GroupViewProps) {
                     </button>
                     {event.minCount !== null &&
                       (block.meetsMin ? (
-                        <span className="rounded-full bg-yes px-2.5 py-1 text-xs font-black text-yes-ink">
+                        <span className="rounded-lg bg-yes px-2.5 py-1 text-xs font-black text-yes-ink">
                           {t('group.enough')}
                         </span>
                       ) : block.mayMeetMin ? (
-                        <span className="hatch rounded-full bg-maybe px-2.5 py-1 text-xs font-black text-maybe-ink">
+                        <span className="hatch rounded-lg bg-maybe px-2.5 py-1 text-xs font-black text-maybe-ink">
                           {t('group.enoughMaybe')}
                         </span>
                       ) : null)}
@@ -381,7 +381,7 @@ function DayDetails({
   const notes = [...names].filter(([, person]) => person.note);
   const chip = (name: string | undefined, key: (typeof keys)[number]) => (
     <span
-      className={`inline-flex max-w-full shrink-0 rounded-full border px-2.5 py-0.5 text-sm font-semibold [overflow-wrap:anywhere] ${style[key].chip}`}
+      className={`inline-flex max-w-full shrink-0 rounded-lg border px-2.5 py-0.5 text-sm font-semibold [overflow-wrap:anywhere] ${style[key].chip}`}
     >
       <bdi>{name}</bdi>
     </span>
@@ -456,7 +456,7 @@ function Legend() {
     <div className="flex items-center gap-2 text-sm font-bold">
       <span>{t('group.legendFew')}</span>
       <div
-        className="flex flex-1 gap-0.5 overflow-hidden rounded-full"
+        className="flex flex-1 gap-0.5 overflow-hidden rounded-lg"
         role="img"
         aria-label={t('group.legend')}
       >

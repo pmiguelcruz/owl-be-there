@@ -80,7 +80,7 @@ export function EventViews(props: {
           <div
             role="tablist"
             aria-label={t('event.tabs')}
-            className="grid grid-cols-2 rounded-full border-2 border-line bg-sunken p-1"
+            className="grid grid-cols-2 rounded-lg border-2 border-line bg-sunken p-1"
           >
             {TABS.map((value) => (
               <button
@@ -101,7 +101,7 @@ export function EventViews(props: {
                     false
                   )
                 }
-                className={`min-h-11 rounded-full font-extrabold transition ${tab === value ? 'bg-surface shadow-card' : 'text-muted'}`}
+                className={`min-h-11 rounded-lg font-extrabold transition ${tab === value ? 'bg-surface shadow-card' : 'text-muted'}`}
               >
                 {value === 'mine' ? (
                   t('event.tabMine')
@@ -110,7 +110,7 @@ export function EventViews(props: {
                     {t('event.tabGroup')}
                     <span
                       aria-hidden="true"
-                      className="ms-1.5 inline-grid min-w-6 place-items-center rounded-full bg-line px-1.5 text-sm text-ink"
+                      className="ms-1.5 inline-grid min-w-6 place-items-center rounded-lg bg-line px-1.5 text-sm text-ink"
                     >
                       {number(answered)}
                     </span>

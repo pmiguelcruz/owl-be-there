@@ -458,7 +458,7 @@ test('a select keeps its shape on focus and draws its own arrow', async ({
     const after = await style(select);
     expect(after.focusVisible).toBe(true);
     expect(after.radius).toBe(before.radius);
-    expect(after.radius).not.toBe('8px');
+    expect(after.radius).toBe('5px');
   }
 
   // Something without a rounding of its own still gets a rounded ring.
@@ -467,7 +467,7 @@ test('a select keeps its shape on focus and draws its own arrow', async ({
   await source.focus();
   expect(await style(source)).toMatchObject({
     focusVisible: true,
-    radius: '8px',
+    radius: '4px',
   });
 });
 

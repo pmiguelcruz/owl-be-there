@@ -30,7 +30,7 @@ const BASE = [
   'inline-flex',
   'items-center',
   'justify-center',
-  'rounded-full',
+  'rounded-lg',
   'font-bold',
   'transition',
   'disabled:cursor-not-allowed',

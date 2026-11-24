@@ -197,7 +197,27 @@
 
 :is([data-event-palette], [data-home-page]) .site-wordmark {
   background: var(--owl-surface);
-  padding-inline: 0.25rem 0.65rem;
+}
+
+/* Make room for both header links on narrow phones. */
+.site-wordmark > svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 22.5rem) {
+  .site-wordmark {
+    column-gap: 0.375rem;
+    padding-inline: 0.625rem;
+  }
+
+  .site-wordmark > svg {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .site-wordmark > span {
+    font-size: 0.875rem;
+  }
 }
 
 /* Keep event text readable even when a bright gradient runs behind it. */
@@ -228,6 +248,11 @@
 
 @theme inline {
   --font-sans: 'Nunito Variable', ui-rounded, system-ui, sans-serif;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.3125rem;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.4375rem;
+  --radius-3xl: 0.5rem;
   --color-bg: var(--owl-bg);
   --color-surface: var(--owl-surface);
   --color-sunken: var(--owl-sunken);
@@ -417,7 +442,7 @@ html:lang(ko) body {
 /*
  * The ring takes the shape of what it surrounds. Its rounding for elements
  * without one of their own (links, plain text) sits in the base layer, so a
- * `rounded-*` utility wins and a pill-shaped select stays a pill on focus.
+ * `rounded-*` utility wins and a control keeps its own corners on focus.
  */
 :focus-visible {
   outline: 3px solid var(--owl-focus);
@@ -426,7 +451,7 @@ html:lang(ko) body {
 
 @layer base {
   :focus-visible {
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
   }
 }
 
@@ -479,7 +504,7 @@ html:lang(ko) body {
   min-height: 2.75rem;
   max-height: 4rem;
   width: 100%;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   align-items: center;
